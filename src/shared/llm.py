@@ -6,9 +6,9 @@ the benchmark's efficiency metric is never missed.
 from __future__ import annotations
 
 import json
-from typing import Any, Optional
+from typing import Any
 
-from .config import CONFIG
+from src.shared.config import CONFIG
 
 
 class LLMResponse:
@@ -109,10 +109,7 @@ def complete(system: str, prompt: str, max_tokens: int = 1024) -> LLMResponse:
         return _call_anthropic(system, prompt, max_tokens)
     if provider == "openai" and CONFIG.openai_api_key:
         return _call_openai(system, prompt, max_tokens)
-    return _call_mock(system, prompt, max_tokens)
-
-
-    # Auto-detect by available key (fallback for when LLM_PROVIDER not set)
+    # Auto-detect by available key (fallback when LLM_PROVIDER is unset or unavailable).
     if CONFIG.groq_api_key:
         return _call_groq(system, prompt, max_tokens)
     if CONFIG.anthropic_api_key:

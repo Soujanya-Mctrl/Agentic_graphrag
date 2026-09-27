@@ -13,12 +13,12 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
-from ..shared.config import CONFIG
-from ..shared.tigergraph_client import get_client
-from ..rag import pipeline as naive_rag
-from ..graphrag import pipeline as graph_rag
-from ..agentic_graphrag import pipeline as agentic_graphrag
-from . import metrics
+from src.shared.config import CONFIG
+from src.shared.tigergraph_client import get_client
+from src.rag import pipeline as naive_rag
+from src.graphrag import pipeline as graph_rag
+from src.agentic_graphrag import pipeline as agentic_graphrag
+from src.benchmark import metrics
 
 
 def load_dataset(path: str) -> List[Dict[str, Any]]:

@@ -8,10 +8,10 @@ Combines:
 """
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from ..shared.llm import complete_json
-from .bert_scorer import compute_bert_score
+from src.shared.llm import complete_json
+from src.benchmark.bert_scorer import compute_bert_score
 
 JUDGE_SYSTEM = (
     "You are grading a candidate answer against a gold reference answer for "
