@@ -11,11 +11,14 @@ without Python 3.13 multithreading tensor crashes.
 from __future__ import annotations
 
 import logging
+import os
 import re
 from functools import lru_cache
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 import numpy as np
+
+from src.shared.config import CONFIG
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +28,23 @@ def _get_encoder():
     """Loads SentenceTransformer encoder once and caches in memory."""
     try:
         from sentence_transformers import SentenceTransformer
-        return SentenceTransformer("all-MiniLM-L6-v2")
-    except Exception as e:
+    except ImportError as e:
+        logger.warning("SentenceTransformer not available (%s), falling back to token overlap", e)
+        return None
+
+    try:
+        if CONFIG.hf_token:
+            os.environ.setdefault("HF_TOKEN", CONFIG.hf_token)
+            os.environ.setdefault("HUGGINGFACE_HUB_TOKEN", CONFIG.hf_token)
+
+        try:
+            return SentenceTransformer("all-MiniLM-L6-v2", token=CONFIG.hf_token or None)
+        except TypeError:
+            try:
+                return SentenceTransformer("all-MiniLM-L6-v2", use_auth_token=CONFIG.hf_token or None)
+            except TypeError:
+                return SentenceTransformer("all-MiniLM-L6-v2")
+    except (OSError, RuntimeError, ValueError) as e:
         logger.warning("SentenceTransformer not available (%s), falling back to token overlap", e)
         return None
 
@@ -65,6 +83,7 @@ def compute_bert_score(
     Computes BERTScore Precision, Recall, and F1 for a candidate answer
     against a reference answer.
     """
+    del model_type
     cand = str(candidate).strip()
     ref = str(reference).strip()
 
@@ -105,7 +124,7 @@ def compute_bert_score(
                     "bert_recall": r,
                     "bert_f1": f1,
                 }
-        except Exception as e:
+        except (ValueError, RuntimeError, AttributeError, TypeError) as e:
             logger.warning("Error during dense embedding similarity (%s), using token fallback", e)
 
     return _fallback_token_f1(cand_tokens, ref_tokens)
@@ -117,4 +136,5 @@ def compute_bert_score_batch(
     model_type: Optional[str] = None,
 ) -> List[Dict[str, float]]:
     """Batch computes BERTScore metrics."""
-    return [compute_bert_score(c, r, model_type=model_type) for c, r in zip(candidates, references)]
+    del model_type
+    return [compute_bert_score(c, r) for c, r in zip(candidates, references)]

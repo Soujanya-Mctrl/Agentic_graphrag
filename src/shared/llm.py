@@ -61,7 +61,7 @@ def _call_openai(system: str, prompt: str, max_tokens: int) -> LLMResponse:
     )
 
 
-def _call_mock(system: str, prompt: str, max_tokens: int) -> LLMResponse:
+def _call_mock(_system: str, _prompt: str, _max_tokens: int) -> LLMResponse:
     """No API key configured — deterministic stub so the pipeline still
     runs end to end for local dev / dry runs. Replace by setting
     ANTHROPIC_API_KEY or OPENAI_API_KEY."""
@@ -136,3 +136,4 @@ def complete_json(system: str, prompt: str, max_tokens: int = 1024) -> tuple[dic
         start, end = text.find("{"), text.rfind("}")
         parsed = json.loads(text[start:end + 1]) if start != -1 and end != -1 else {}
     return parsed, resp
+

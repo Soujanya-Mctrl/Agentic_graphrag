@@ -56,7 +56,7 @@ st.set_page_config(
 for key in [
     "TG_HOST", "TG_GRAPHNAME", "TG_SECRET", "TG_USERNAME", "TG_PASSWORD",
     "TG_TGCLOUD", "GROQ_API_KEY", "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "TG_USE_MOCK",
-    "GROQ_MODEL", "LLM_PROVIDER",
+    "GROQ_MODEL", "LLM_PROVIDER", "HF_TOKEN", "HUGGINGFACE_HUB_TOKEN",
 ]:
     if hasattr(st, "secrets") and key in st.secrets:
         os.environ[key] = str(st.secrets[key])
@@ -270,10 +270,10 @@ with st.sidebar:
     st.markdown("""
     <div style="font-size:0.8rem; color:#64748b; line-height:1.5;">
     <b>TigerGraph Round 1 Deliverables:</b><br>
-    • Working Agentic GraphRAG<br>
-    • 3-Way Comparative Benchmark<br>
-    • Accuracy, Completeness & BERTScore<br>
-    • Interactive Subgraph Visualization
+    - Working Agentic GraphRAG<br>
+    - 3-Way Comparative Benchmark<br>
+    - Accuracy, Completeness & BERTScore<br>
+    - Interactive Subgraph Visualization
     </div>
     """, unsafe_allow_html=True)
 

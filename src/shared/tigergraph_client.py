@@ -23,6 +23,11 @@ class TigerGraphClient:
 
         is_tg_cloud = "tgcloud.io" in CONFIG.tg_host or os.getenv("TG_TGCLOUD", "false").lower() == "true"
 
+        def _normalize_token(token_value):
+            if isinstance(token_value, (tuple, list)) and token_value:
+                return token_value[0]
+            return token_value
+
         if CONFIG.tg_secret:
             self.conn = tg.TigerGraphConnection(
                 host=CONFIG.tg_host,
@@ -31,7 +36,14 @@ class TigerGraphClient:
                 tgCloud=is_tg_cloud,
             )
             # Exchange secret for authorization token
-            self.conn.getToken(secret=CONFIG.tg_secret)
+            token = _normalize_token(self.conn.getToken(secret=CONFIG.tg_secret))
+            if token:
+                self.conn = tg.TigerGraphConnection(
+                    host=CONFIG.tg_host,
+                    graphname=CONFIG.tg_graph_name,
+                    tgCloud=is_tg_cloud,
+                    apiToken=token,
+                )
         else:
             self.conn = tg.TigerGraphConnection(
                 host=CONFIG.tg_host,
@@ -41,7 +53,14 @@ class TigerGraphClient:
                 tgCloud=is_tg_cloud,
             )
             if CONFIG.tg_username and CONFIG.tg_password:
-                self.conn.getToken()
+                token = _normalize_token(self.conn.getToken())
+                if token:
+                    self.conn = tg.TigerGraphConnection(
+                        host=CONFIG.tg_host,
+                        graphname=CONFIG.tg_graph_name,
+                        tgCloud=is_tg_cloud,
+                        apiToken=token,
+                    )
 
     def entity_search(self, mention: str, top_k: int = 5) -> list[dict[str, Any]]:
         # Expect a GSQL query installed as e.g. `entityLinkByName`

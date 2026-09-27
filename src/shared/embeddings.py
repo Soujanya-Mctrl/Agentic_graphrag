@@ -4,6 +4,7 @@ otherwise a deterministic hash-based fallback so vector_search still runs
 from __future__ import annotations
 
 import hashlib
+import os
 from functools import lru_cache
 
 from .config import CONFIG
@@ -13,14 +14,29 @@ _DIM = 384
 
 @lru_cache(maxsize=1)
 def _model():
-    from sentence_transformers import SentenceTransformer
-    return SentenceTransformer(CONFIG.embedding_model)
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError:
+        raise
+
+    if CONFIG.hf_token:
+        os.environ.setdefault("HF_TOKEN", CONFIG.hf_token)
+        os.environ.setdefault("HUGGINGFACE_HUB_TOKEN", CONFIG.hf_token)
+
+    try:
+        return SentenceTransformer(CONFIG.embedding_model, token=CONFIG.hf_token or None)
+    except TypeError:
+        # Older sentence-transformers versions use a different auth keyword or no auth kwarg at all.
+        try:
+            return SentenceTransformer(CONFIG.embedding_model, use_auth_token=CONFIG.hf_token or None)
+        except TypeError:
+            return SentenceTransformer(CONFIG.embedding_model)
 
 
 def embed(text: str) -> list[float]:
     try:
         return _model().encode(text).tolist()
-    except Exception:
+    except (ImportError, OSError, RuntimeError, ValueError, AttributeError):
         # Deterministic fallback: hash chunks of the string into a fixed-size
         # vector. Not semantically meaningful — replace by installing
         # sentence-transformers before you trust vector_search results.

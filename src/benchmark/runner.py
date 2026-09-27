@@ -173,10 +173,10 @@ def run_all(
             compute_bert=compute_bert,
         )
 
-        for p_name, row in q_eval["pipeline_results"].items():
+        for _p_name, row in q_eval["pipeline_results"].items():
             per_question_results.append(row)
 
-        for p_name, raw in q_eval["raw_outputs"].items():
+        for _p_name, raw in q_eval["raw_outputs"].items():
             raw_runs.append(raw)
 
         if progress_callback:

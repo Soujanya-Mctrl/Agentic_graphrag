@@ -16,6 +16,7 @@ class Config:
     anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     openai_model: str = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+    hf_token: str = os.getenv("HF_TOKEN", "") or os.getenv("HUGGINGFACE_HUB_TOKEN", "")
 
     # --- TigerGraph / Savanna ---
     tg_host: str = os.getenv("TG_HOST", "")

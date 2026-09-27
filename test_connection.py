@@ -59,13 +59,28 @@ def test_db_connection():
             apiToken=api_token if api_token else None
         )
 
+        def normalize_token(token_value):
+            if isinstance(token_value, (tuple, list)) and token_value:
+                return token_value[0]
+            return token_value
+
         # Attempt token fetch with secret or username/password
+        token = None
         if secret:
-            token = conn.getToken(secret=secret)
+            token = normalize_token(conn.getToken(secret=secret))
             print("[✓] Successfully minted auth token using TG_SECRET!")
         elif not api_token:
-            token = conn.getToken()
+            token = normalize_token(conn.getToken())
             print("[✓] Successfully fetched auth token!")
+
+        if token:
+            conn = tg.TigerGraphConnection(
+                host=host,
+                graphname=graphname,
+                tgCloud=tg_cloud,
+                apiToken=token,
+            )
+
         ver = conn.getVer()
         print(f"[✓] Connected successfully! TigerGraph Version: {ver}")
 
