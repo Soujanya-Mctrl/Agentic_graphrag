@@ -73,8 +73,38 @@ def _call_mock(system: str, prompt: str, max_tokens: int) -> LLMResponse:
     return LLMResponse(text=stub, input_tokens=0, output_tokens=0)
 
 
+def _call_groq(system: str, prompt: str, max_tokens: int) -> LLMResponse:
+    """
+    Uses Groq via its OpenAI-compatible endpoint.
+    Avoids the native groq SDK which has CLR memory issues on Python 3.13 / Windows.
+    """
+    from openai import OpenAI
+
+    client = OpenAI(
+        api_key=CONFIG.groq_api_key,
+        base_url="https://api.groq.com/openai/v1",
+    )
+    resp = client.chat.completions.create(
+        model=CONFIG.groq_model,
+        max_tokens=max_tokens,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+    )
+    choice = resp.choices[0].message.content or ""
+    usage = resp.usage
+    return LLMResponse(
+        text=choice,
+        input_tokens=usage.prompt_tokens if usage else 0,
+        output_tokens=usage.completion_tokens if usage else 0,
+    )
+
+
 def complete(system: str, prompt: str, max_tokens: int = 1024) -> LLMResponse:
     provider = CONFIG.llm_provider
+    if provider == "groq" and CONFIG.groq_api_key:
+        return _call_groq(system, prompt, max_tokens)
     if provider == "anthropic" and CONFIG.anthropic_api_key:
         return _call_anthropic(system, prompt, max_tokens)
     if provider == "openai" and CONFIG.openai_api_key:
@@ -82,6 +112,14 @@ def complete(system: str, prompt: str, max_tokens: int = 1024) -> LLMResponse:
     return _call_mock(system, prompt, max_tokens)
 
 
+    # Auto-detect by available key (fallback for when LLM_PROVIDER not set)
+    if CONFIG.groq_api_key:
+        return _call_groq(system, prompt, max_tokens)
+    if CONFIG.anthropic_api_key:
+        return _call_anthropic(system, prompt, max_tokens)
+    if CONFIG.openai_api_key:
+        return _call_openai(system, prompt, max_tokens)
+    return _call_mock(system, prompt, max_tokens)
 def complete_json(system: str, prompt: str, max_tokens: int = 1024) -> tuple[dict[str, Any], LLMResponse]:
     """Ask for strict JSON, parse defensively (strip code fences, retry-safe)."""
     json_instruction = (

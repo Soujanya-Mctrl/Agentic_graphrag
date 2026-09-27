@@ -9,7 +9,9 @@ from dataclasses import dataclass
 @dataclass
 class Config:
     # --- LLM ---
-    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" | "openai"
+    llm_provider: str = os.getenv("LLM_PROVIDER", "groq")  # "groq" | "anthropic" | "openai"
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+    groq_model: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     anthropic_model: str = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
     openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
