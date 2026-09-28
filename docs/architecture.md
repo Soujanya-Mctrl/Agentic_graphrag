@@ -45,14 +45,14 @@ Standard Retrieval-Augmented Generation (**RAG**) relies on flat vector similari
 ## 2. High-Level System Architecture
 
 The overall repository is modularized into distinct layers with strict dependency boundaries:
-- [`src/shared/`](file:///d:/Projects/agentic_graphrag/src/shared): Common abstractions ([`Config`](file:///d:/Projects/agentic_graphrag/src/shared/config.py#L10), [`InvestigationState`](file:///d:/Projects/agentic_graphrag/src/shared/state.py#L52), [`TigerGraphClient`](file:///d:/Projects/agentic_graphrag/src/shared/tigergraph_client.py#L17), [`LLM`](file:///d:/Projects/agentic_graphrag/src/shared/llm.py), [`Embeddings`](file:///d:/Projects/agentic_graphrag/src/shared/embeddings.py)).
-- [`src/rag/`](file:///d:/Projects/agentic_graphrag/src/rag): Baseline 1 (vector search only).
-- [`src/graphrag/`](file:///d:/Projects/agentic_graphrag/src/graphrag): Baseline 2 (fixed-sequence graph + vector).
-- [`src/agentic_graphrag/`](file:///d:/Projects/agentic_graphrag/src/agentic_graphrag): System under test (LangGraph orchestrator + 7 specialist agents).
-- [`src/benchmark/`](file:///d:/Projects/agentic_graphrag/src/benchmark): LLM-as-a-Judge scoring, metric aggregations, HTML dashboard.
-- [`backend/`](file:///d:/Projects/agentic_graphrag/backend): High-performance FastAPI REST API serving all pipelines, cluster status, and benchmark execution.
-- [`frontend/`](file:///d:/Projects/agentic_graphrag/frontend): Modern React 19 + Vite 8 Single Page Application with interactive SVG subgraphs and LangGraph decision DAGs.
-- [`run_backend.py`](file:///d:/Projects/agentic_graphrag/run_backend.py): Unified server launcher hosting the FastAPI REST API and static React UI.
+- [`src/shared/`](../src/shared): Common abstractions ([`Config`](../src/shared/config.py#L10), [`InvestigationState`](../src/shared/state.py#L52), [`TigerGraphClient`](../src/shared/tigergraph_client.py#L17), [`LLM`](../src/shared/llm.py), [`Embeddings`](../src/shared/embeddings.py)).
+- [`src/rag/`](../src/rag): Baseline 1 (vector search only).
+- [`src/graphrag/`](../src/graphrag): Baseline 2 (fixed-sequence graph + vector).
+- [`src/agentic_graphrag/`](../src/agentic_graphrag): System under test (LangGraph orchestrator + 7 specialist agents).
+- [`src/benchmark/`](../src/benchmark): LLM-as-a-Judge scoring, metric aggregations, HTML dashboard.
+- [`backend/`](../backend): High-performance FastAPI REST API serving all pipelines, cluster status, and benchmark execution.
+- [`frontend/`](../frontend): Modern React 19 + Vite 8 Single Page Application with interactive SVG subgraphs and LangGraph decision DAGs.
+- [`run_backend.py`](../run_backend.py): Unified server launcher hosting the FastAPI REST API and static React UI.
 
 ```mermaid
 flowchart TD
@@ -104,20 +104,20 @@ flowchart TD
 
 ## 3. The Agentic Control Loop (LangGraph StateGraph)
 
-The agentic pipeline is built on **LangGraph** ([`src/agentic_graphrag/agents/orchestrator.py`](file:///d:/Projects/agentic_graphrag/src/agentic_graphrag/agents/orchestrator.py)) using a cyclic state machine.
+The agentic pipeline is built on **LangGraph** ([`src/agentic_graphrag/agents/orchestrator.py`](../src/agentic_graphrag/agents/orchestrator.py)) using a cyclic state machine.
 
 ### 3.1 State Representation
 
 The agent operates over two interconnected state models:
 
-1. **[`InvestigationState`](file:///d:/Projects/agentic_graphrag/src/shared/state.py#L52)**: Domain model holding accumulated findings:
+1. **[`InvestigationState`](../src/shared/state.py#L52)**: Domain model holding accumulated findings:
    - `evidence: dict[str, EvidenceItem]`: Deduplicated evidence items tagged with provenance, confidence, and conflict flags.
    - `steps: list[InvestigationStep]`: Audit log of decisions, rationale, tools invoked, and token expenditures.
    - `linked_entities: list[dict]`: Cache of entities resolved in graph searches.
    - `gaps: list[str]`: Running notes on missing links or unverified facts.
    - `final_answer: str` and `final_confidence: float`.
 
-2. **[`GraphState`](file:///d:/Projects/agentic_graphrag/src/agentic_graphrag/agents/orchestrator.py#L43)**: LangGraph `TypedDict` wrapper passed between nodes:
+2. **[`GraphState`](../src/agentic_graphrag/agents/orchestrator.py#L43)**: LangGraph `TypedDict` wrapper passed between nodes:
    ```python
    class GraphState(TypedDict):
        inv: InvestigationState    # Domain state
@@ -157,12 +157,12 @@ flowchart LR
 
 ### 3.3 Dynamic Routing & Stopping Criteria
 
-At each turn of [`orchestrate`](file:///d:/Projects/agentic_graphrag/src/agentic_graphrag/agents/orchestrator.py#L99):
+At each turn of [`orchestrate`](../src/agentic_graphrag/agents/orchestrator.py#L99):
 1. **Budget Check**: If `inv.should_force_stop(CONFIG.max_investigation_steps)` is true, execution routes directly to `finalize` with reason `max_steps_reached`.
 2. **Context Assembly**: The prompt provides the user query, previously taken actions, the latest gap note, and condensed evidence summary (`max_chars=4000`).
 3. **Structured Decision**: The LLM outputs strict JSON selecting an action, input arguments, and rationale.
-4. **Conditional Branching ([`route_action`](file:///d:/Projects/agentic_graphrag/src/agentic_graphrag/agents/orchestrator.py#L126))**: The router dispatches to the requested specialist node, which updates the evidence store and loops back to `orchestrate`.
-5. **Terminal Finalization ([`node_finalize`](file:///d:/Projects/agentic_graphrag/src/agentic_graphrag/agents/orchestrator.py#L203))**: Synthesizes the final response citing evidence IDs inline (e.g., `[e1]`, `[d1]`), computes total token expenditure, and sets `stopped=True`.
+4. **Conditional Branching ([`route_action`](../src/agentic_graphrag/agents/orchestrator.py#L126))**: The router dispatches to the requested specialist node, which updates the evidence store and loops back to `orchestrate`.
+5. **Terminal Finalization ([`node_finalize`](../src/agentic_graphrag/agents/orchestrator.py#L203))**: Synthesizes the final response citing evidence IDs inline (e.g., `[e1]`, `[d1]`), computes total token expenditure, and sets `stopped=True`.
 
 ---
 
@@ -172,7 +172,7 @@ The orchestrator coordinates seven specialized agents separated into **Retrieval
 
 | Agent Name | Category | Function Signature | Description |
 | :--- | :--- | :--- | :--- |
-| **`entity_linking_agent`** | Retrieval | `(state, client, mention: str)` | Queries TigerGraph for candidate vertices matching a name or term. Records [`EvidenceItem`](file:///d:/Projects/agentic_graphrag/src/shared/state.py#L28) with `confidence=0.9`. |
+| **`entity_linking_agent`** | Retrieval | `(state, client, mention: str)` | Queries TigerGraph for candidate vertices matching a name or term. Records [`EvidenceItem`](../src/shared/state.py#L28) with `confidence=0.9`. |
 | **`graph_traversal_agent`** | Retrieval | `(state, client, start_node_id: str, hops: int, edge_types: list)` | Performs $k$-hop graph walks from a known vertex. Returns structured relations (`src --rel--> dst`). |
 | **`vector_search_agent`** | Retrieval | `(state, client, query_text: str, top_k: int)` | Computes query vector embedding and retrieves top-ranked unstructured text passages. |
 | **`document_retrieval_agent`**| Retrieval | `(state, client, doc_id: str)` | Fetches the full text of an article when an evidence snippet references a specific document ID. |
@@ -184,7 +184,7 @@ The orchestrator coordinates seven specialized agents separated into **Retrieval
 
 ## 5. TigerGraph Schema & Knowledge Graph Design
 
-The knowledge graph is modeled to represent the Olympic corpus ([`data/corpus/corpus.jsonl`](file:///d:/Projects/agentic_graphrag/data/corpus/corpus.jsonl)), containing 2,951 documents and ~5.47M tokens.
+The knowledge graph is modeled to represent the Olympic corpus ([`data/corpus/corpus.jsonl`](../data/corpus/corpus.jsonl)), containing 2,951 documents and ~5.47M tokens.
 
 ### 5.1 Graph Schema Topology
 
@@ -226,7 +226,7 @@ erDiagram
     - `PART_OF_GAMES`: `(Event) -> (Games)`
     - `IN_SPORT`: `(Event) -> (Sport)`
 
-### 5.2 Ingestion Engine ([`scripts/ingest_corpus.py`](file:///d:/Projects/agentic_graphrag/scripts/ingest_corpus.py))
+### 5.2 Ingestion Engine ([`scripts/ingest_corpus.py`](../scripts/ingest_corpus.py))
 
 1. Streams `corpus.jsonl` line by line.
 2. Extracts structured Olympic Infobox attributes (`games`, `venue`, `gold`, `silver`, `bronze`, `goldNOC`, etc.) via regex parsers.
@@ -255,7 +255,7 @@ To objectively evaluate the contribution of **agentic orchestration**, the bench
 
 ## 7. Evaluation & Benchmark Metrics
 
-Scoring is executed by [`src/benchmark/runner.py`](file:///d:/Projects/agentic_graphrag/src/benchmark/runner.py) and evaluated in [`src/benchmark/metrics.py`](file:///d:/Projects/agentic_graphrag/src/benchmark/metrics.py):
+Scoring is executed by [`src/benchmark/runner.py`](../src/benchmark/runner.py) and evaluated in [`src/benchmark/metrics.py`](../src/benchmark/metrics.py):
 
 ### 7.1 Accuracy & Completeness (LLM-as-a-Judge)
 
@@ -283,7 +283,7 @@ For the agentic pipeline, the system logs:
 
 ## 8. User Interface & Interactive Demo
 
-The React 19 + FastAPI web application ([`frontend/`](file:///d:/Projects/agentic_graphrag/frontend), [`backend/main.py`](file:///d:/Projects/agentic_graphrag/backend/main.py)) provides:
+The React 19 + FastAPI web application ([`frontend/`](../frontend), [`backend/main.py`](../backend/main.py)) provides:
 1. **Interactive Investigation Console**: Pre-loaded with challenge questions across aggregation, temporal, multi-hop, and superlative categories.
 2. **Three-Panel Comparative Execution**: Real-time display of answers, latencies, token counts, and live BERTScore metrics across Naive RAG, Fixed GraphRAG, and Agentic GraphRAG.
 3. **Interactive Knowledge Subgraph Visualizer**: Vector-rendered SVG network displaying retrieved Olympic entities, venues, sports, and countries with zoom, pan, and node inspection.
@@ -310,8 +310,8 @@ flowchart TD
 ```
 
 1. **State Extension**:
-   - Add `valid_from: Optional[str]`, `valid_until: Optional[str]`, and `source_authority: float` to [`EvidenceItem`](file:///d:/Projects/agentic_graphrag/src/shared/state.py#L28).
+   - Add `valid_from: Optional[str]`, `valid_until: Optional[str]`, and `source_authority: float` to [`EvidenceItem`](../src/shared/state.py#L28).
 2. **New Specialist Node**:
    - Implement `temporal_reasoning_agent` to compare conflicting facts based on timestamp ordering, Wikipedia revision dates, or domain authority.
 3. **Orchestrator Routing**:
-   - Add `resolve_conflict` to [`ActionType`](file:///d:/Projects/agentic_graphrag/src/shared/state.py#L16). When [`evidence_evaluation_agent`](file:///d:/Projects/agentic_graphrag/src/agentic_graphrag/agents/reasoning.py#L58) flags non-empty contradictions, the orchestrator triggers conflict resolution rather than prematurely falling back to `answer`.
+   - Add `resolve_conflict` to [`ActionType`](../src/shared/state.py#L16). When [`evidence_evaluation_agent`](../src/agentic_graphrag/agents/reasoning.py#L58) flags non-empty contradictions, the orchestrator triggers conflict resolution rather than prematurely falling back to `answer`.
