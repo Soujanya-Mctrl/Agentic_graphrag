@@ -27,6 +27,14 @@ os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
 os.environ.setdefault("MALLOC_TRIM_THRESHOLD_", "65536")
+os.environ.setdefault("USE_MOCK_EMBEDDINGS", "1")
+os.environ.setdefault("LOW_MEMORY_MODE", "1")
+
+# Prevent any module from loading heavy PyTorch (which allocates 350MB+ RSS alone)
+# whenever running in cloud (Render 512MB limit) or low-memory mode
+if os.environ.get("RENDER") or os.environ.get("LOW_MEMORY_MODE", "1") == "1":
+    sys.modules["torch"] = None
+    sys.modules["sentence_transformers"] = None
 
 import gc
 

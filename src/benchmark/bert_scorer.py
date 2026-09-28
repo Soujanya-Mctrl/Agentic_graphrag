@@ -26,7 +26,12 @@ logger = logging.getLogger(__name__)
 @lru_cache(maxsize=1)
 def _get_encoder():
     """Loads SentenceTransformer encoder once and caches in memory."""
-    if os.environ.get("RENDER") == "true" or os.environ.get("USE_MOCK_EMBEDDINGS") == "1":
+    if (
+        os.environ.get("RENDER")
+        or os.environ.get("USE_MOCK_EMBEDDINGS") == "1"
+        or os.environ.get("LOW_MEMORY_MODE", "1") == "1"
+        or os.environ.get("DISABLE_TORCH") == "1"
+    ):
         return None
 
     try:
