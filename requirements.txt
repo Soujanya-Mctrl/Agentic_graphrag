@@ -12,8 +12,7 @@ langgraph>=0.2.0
 # ── TigerGraph Client ──────────────────────────────────────────────────────────
 pyTigerGraph>=1.5.0
 
-# ── Embeddings & Semantic Scoring ──────────────────────────────────────────────
-sentence-transformers>=3.0.0
+# ── Embeddings & Numeric Support ───────────────────────────────────────────────
 numpy>=1.26.0
 
 # ── FastAPI Backend ─────────────────────────────────────────────────────────────
@@ -21,10 +20,7 @@ fastapi>=0.115.0
 uvicorn[standard]>=0.30.0
 pydantic>=2.0.0
 
-
-# ── Data & Visualization ───────────────────────────────────────────────────────
-pandas>=2.0.0
-plotly>=5.20.0
+# ── Graph Algorithms & Structures ──────────────────────────────────────────────
 networkx>=3.0.0
 
 # ── Utilities ──────────────────────────────────────────────────────────────────
