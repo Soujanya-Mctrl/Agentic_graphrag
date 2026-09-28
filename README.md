@@ -4,11 +4,10 @@
 [![React](https://img.shields.io/badge/Frontend-React%2019%20%2B%20Vite%208-61DAFB.svg)](https://react.dev/)
 [![TigerGraph](https://img.shields.io/badge/TigerGraph-Savanna%204.2.5-orange.svg)](https://tgcloud.io/)
 [![LangGraph](https://img.shields.io/badge/Orchestrator-LangGraph-blue.svg)](https://github.com/langchain-ai/langgraph)
-[![Streamlit](https://img.shields.io/badge/Legacy%20UI-Streamlit-red.svg)](https://streamlit.io/)
 [![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
 
-An autonomous, goal-driven **Agentic GraphRAG** system powered by **TigerGraph** and **LangGraph**, benchmarked side-by-side against **Naive RAG** and **Fixed-Sequence GraphRAG** across accuracy, completeness, semantic alignment (BERTScore), latency, and token efficiency. Available as a full-featured **React + FastAPI** modern web application.
+An autonomous, goal-driven **Agentic GraphRAG** system powered by **TigerGraph** and **LangGraph**, benchmarked side-by-side against **Naive RAG** and **Fixed-Sequence GraphRAG** across accuracy, completeness, semantic alignment (BERTScore), latency, and token efficiency. Served as a high-performance **React 19 + FastAPI** full-stack web application.
 
 > **Headline Question:** *When does a complex query require an autonomous, multi-step investigation rather than a single vector or hardcoded graph retrieval?*
 
@@ -23,10 +22,9 @@ An autonomous, goal-driven **Agentic GraphRAG** system powered by **TigerGraph**
 - [Getting Started & Installation](#-getting-started--installation)
 - [How to Run](#-how-to-run)
   - [1. React + FastAPI Full-Stack Web Application](#1-react--fastapi-full-stack-web-application)
-  - [2. Interactive Streamlit Dashboard (Alternative)](#2-interactive-streamlit-web-dashboard-alternative)
-  - [3. Automated Benchmark Runner](#3-automated-three-way-benchmark-runner)
-  - [4. TigerGraph Cloud & MCP Verification](#4-tigergraph-cloud--mcp-verification)
-  - [5. Test Suite](#5-offline-smoke--unit-tests)
+  - [2. Automated Three-Way Benchmark Runner](#2-automated-three-way-benchmark-runner)
+  - [3. TigerGraph Cloud & MCP Verification](#3-tigergraph-cloud--mcp-verification)
+  - [4. Test Suite](#4-offline-smoke--unit-tests)
 - [Evaluation Methodology](#-evaluation-methodology)
 - [Repository Structure](#-repository-structure)
 - [Submission Deliverables Checklist](#-submission-deliverables-checklist)
@@ -44,7 +42,7 @@ An autonomous, goal-driven **Agentic GraphRAG** system powered by **TigerGraph**
   - LLM-as-a-Judge scoring for factual **Accuracy** ($0.0 - 1.0$) and **Completeness** ($0.0 - 1.0$).
   - **BERTScore** semantic alignment ($F_1$, Precision, Recall) via `sentence-transformers`.
   - Token cost accounting and audit-trail metrics (step count, confidence trajectory).
-- **Interactive Streamlit Web Console** (`app.py`): Real-time three-column execution, interactive NetworkX knowledge subgraphs, and LangGraph trace DAG visualizer.
+- **Modern React 19 + FastAPI Web Console**: Real-time three-column execution, interactive SVG knowledge subgraphs, step-by-step LangGraph decision DAG visualizer, scorecard KPIs, and multi-model Groq selector.
 - **Offline Mock & Live Cloud Modes**: Switchable between in-memory `MockTigerGraphClient` and live TigerGraph Savanna Cloud (`pyTigerGraph` + `tigergraph-mcp`).
 
 ---
@@ -54,7 +52,8 @@ An autonomous, goal-driven **Agentic GraphRAG** system powered by **TigerGraph**
 ```mermaid
 flowchart TD
     subgraph UI ["User & Presentation Layer"]
-        ST["Streamlit UI (app.py)"]
+        REACT["React 19 Frontend (frontend/)"]
+        API["FastAPI REST & Static Server (backend/main.py)"]
         CLI["Benchmark Runner (src/benchmark/runner.py)"]
         HTML["Dashboard Report (results/dashboard.html)"]
     end
@@ -213,18 +212,7 @@ npm --prefix frontend run dev
 
 ---
 
-### 2. Interactive Streamlit Web Dashboard (Alternative)
-
-If you prefer the classic Streamlit interface, you can still launch `app.py`:
-
-```powershell
-streamlit run app.py
-```
-*Open `http://localhost:8501` in your browser.*
-
----
-
-### 3. Automated Three-Way Benchmark Runner
+### 2. Automated Three-Way Benchmark Runner
 
 Execute all three pipelines across questions, compute LLM-as-a-judge accuracy and BERTScore, and save raw audit runs:
 
@@ -233,7 +221,7 @@ python -m src.benchmark.runner
 ```
 Outputs are saved to [`results/benchmark_results.json`](results/benchmark_results.json) and [`results/raw_runs.json`](results/raw_runs.json).
 
-### 4. TigerGraph Cloud & MCP Verification
+### 3. TigerGraph Cloud & MCP Verification
 
 Test your live connection to TigerGraph Savanna Cloud and the TigerGraph Model Context Protocol (MCP) server:
 
@@ -241,13 +229,14 @@ Test your live connection to TigerGraph Savanna Cloud and the TigerGraph Model C
 python test_connection.py
 ```
 
-### 5. Offline Smoke & Unit Tests
+### 4. Offline Smoke & Unit Tests
 
 Run the offline pytest test suite (12 passing tests):
 
 ```powershell
 python -m pytest
 ```
+
 
 ---
 
@@ -270,33 +259,41 @@ For every test question across all three pipelines, the system logs and calculat
 ## 📁 Repository Structure
 
 ```
-src/
-├── shared/                        # Shared infrastructure (imported by all pipelines)
-│   ├── config.py                  # Central configuration from .env
-│   ├── state.py                   # InvestigationState, EvidenceItem, InvestigationStep
-│   ├── llm.py                     # Choke-point LLM gateway (Groq, Anthropic, OpenAI, Mock)
-│   ├── embeddings.py              # Dense vector embedder with deterministic fallback
-│   └── tigergraph_client.py       # Real pyTigerGraph & MockTigerGraphClient
-│
-├── rag/                           # Baseline 1: Naive vector search
-│   └── pipeline.py                # Flat vector search -> LLM synthesis
-│
-├── graphrag/                      # Baseline 2: Fixed GraphRAG
-│   └── pipeline.py                # Entity Link -> 1-Hop Traverse -> Vector -> LLM synthesis
-│
-├── agentic_graphrag/              # System: Autonomous Agentic GraphRAG
-│   ├── pipeline.py                # Pipeline entry point
-│   └── agents/
-│       ├── orchestrator.py        # LangGraph StateGraph cyclic control loop
-│       ├── retrieval.py           # Entity link, graph traverse, vector search, doc retrieve
-│       └── reasoning.py           # Aggregation, multi-hop reasoning, evidence evaluation
-│
-└── benchmark/                     # Scoring and evaluation suite
-    ├── runner.py                  # Batch runner over JSON/JSONL datasets
-    ├── metrics.py                 # LLM-as-a-judge scoring
-    ├── bert_scorer.py             # BERTScore semantic evaluator
-    ├── dashboard.py               # Standalone HTML/Chart.js report generator
-    └── visualizer.py              # Streamlit Plotly subgraphs & DAG visualizers
+agentic_graphrag/
+├── backend/                       # FastAPI REST API & static file server
+│   └── main.py                    # REST endpoints, background benchmarks & SSE
+├── frontend/                      # Modern React 19 + Vite 8 frontend
+│   ├── src/                       # Components (Navbar, Tabs, Visualizers)
+│   ├── package.json
+│   └── dist/                      # Pre-compiled production bundle
+├── run_backend.py                 # Unified server launcher (Port 8000)
+├── scripts/
+│   ├── ingest_corpus.py           # TigerGraph schema creation & data loader
+│   └── test_tgcloud.py            # Savanna connection & token tester
+├── src/
+│   ├── shared/                    # Shared infrastructure (imported by all pipelines)
+│   │   ├── config.py              # Central configuration from .env
+│   │   ├── state.py               # InvestigationState, EvidenceItem, InvestigationStep
+│   │   ├── llm.py                 # Choke-point LLM gateway (Groq, Anthropic, OpenAI, Mock)
+│   │   ├── embeddings.py          # Dense vector embedder with deterministic fallback
+│   │   └── tigergraph_client.py   # Real pyTigerGraph & MockTigerGraphClient
+│   ├── rag/                       # Baseline 1: Naive vector search
+│   │   └── pipeline.py            # Flat vector search -> LLM synthesis
+│   ├── graphrag/                  # Baseline 2: Fixed GraphRAG
+│   │   └── pipeline.py            # Entity Link -> 1-Hop Traverse -> Vector -> LLM synthesis
+│   ├── agentic_graphrag/          # System: Autonomous Agentic GraphRAG
+│   │   ├── pipeline.py            # Pipeline entry point
+│   │   └── agents/
+│   │       ├── orchestrator.py    # LangGraph StateGraph cyclic control loop
+│   │       ├── retrieval.py       # Entity link, graph traverse, vector search, doc retrieve
+│   │       └── reasoning.py       # Aggregation, multi-hop reasoning, evidence evaluation
+│   └── benchmark/                 # Scoring and evaluation suite
+│       ├── runner.py              # Batch runner over JSON/JSONL datasets
+│       ├── metrics.py             # LLM-as-a-judge scoring
+│       ├── bert_scorer.py         # BERTScore semantic evaluator
+│       ├── dashboard.py           # Standalone HTML/Chart.js report generator
+│       └── visualizer.py          # Plotly network graphs & DAG visualizers
+└── tests/                         # Pytest test harness
 ```
 
 ---
@@ -308,7 +305,7 @@ src/
 | **Working Agentic GraphRAG System** | [`src/agentic_graphrag/agents/orchestrator.py`](src/agentic_graphrag/agents/orchestrator.py) | ✅ Operational |
 | **Three-Way Benchmark** | [`src/benchmark/runner.py`](src/benchmark/runner.py) | ✅ Operational |
 | **Metrics Dashboard** | [`src/benchmark/dashboard.py`](src/benchmark/dashboard.py) → `results/dashboard.html` | ✅ Operational |
-| **Interactive UI Demo** | [`app.py`](app.py) (Streamlit multi-panel console) | ✅ Operational |
+| **Interactive UI Demo** | [`frontend/`](frontend/) (React 19 SPA) & [`backend/`](backend/) (FastAPI REST API) | ✅ Operational |
 | **Architecture Specification** | [`docs/architecture.md`](docs/architecture.md) | ✅ Complete |
 | **TigerGraph Ingestion Pipeline** | [`scripts/ingest_corpus.py`](scripts/ingest_corpus.py) | ✅ Complete |
 | **Offline Test Suite** | [`tests/test_harness.py`](tests/test_harness.py) + [`tests/test_bert_score.py`](tests/test_bert_score.py) | ✅ 12/12 Passing |

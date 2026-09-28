@@ -15,8 +15,10 @@ _DIM = 384
 @lru_cache(maxsize=1)
 def _model():
     try:
+        import torch
+        torch.set_num_threads(1)
         from sentence_transformers import SentenceTransformer
-    except ImportError:
+    except Exception:
         raise
 
     if CONFIG.hf_token:
@@ -24,16 +26,20 @@ def _model():
         os.environ.setdefault("HUGGINGFACE_HUB_TOKEN", CONFIG.hf_token)
 
     try:
-        return SentenceTransformer(CONFIG.embedding_model, token=CONFIG.hf_token or None)
+        return SentenceTransformer(CONFIG.embedding_model, token=CONFIG.hf_token or None, device="cpu")
     except TypeError:
         # Older sentence-transformers versions use a different auth keyword or no auth kwarg at all.
         try:
-            return SentenceTransformer(CONFIG.embedding_model, use_auth_token=CONFIG.hf_token or None)
+            return SentenceTransformer(CONFIG.embedding_model, use_auth_token=CONFIG.hf_token or None, device="cpu")
         except TypeError:
-            return SentenceTransformer(CONFIG.embedding_model)
+            return SentenceTransformer(CONFIG.embedding_model, device="cpu")
 
 
 def embed(text: str) -> list[float]:
+    if os.environ.get("USE_MOCK_EMBEDDINGS") == "1":
+        h = hashlib.sha256(text.encode("utf-8")).digest()
+        vec = [(b - 127.5) / 127.5 for b in h]
+        return (vec * (_DIM // len(vec) + 1))[:_DIM]
     try:
         return _model().encode(text).tolist()
     except (ImportError, OSError, RuntimeError, ValueError, AttributeError):
@@ -43,3 +49,4 @@ def embed(text: str) -> list[float]:
         h = hashlib.sha256(text.encode("utf-8")).digest()
         vec = [(b - 127.5) / 127.5 for b in h]
         return (vec * (_DIM // len(vec) + 1))[:_DIM]
+

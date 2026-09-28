@@ -3,8 +3,6 @@
 .env.*
 !.env.example
 
-# Streamlit secrets (real values — never commit)
-.streamlit/secrets.toml
 
 # Python
 __pycache__/

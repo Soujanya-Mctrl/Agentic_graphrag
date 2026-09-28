@@ -50,12 +50,15 @@ The overall repository is modularized into distinct layers with strict dependenc
 - [`src/graphrag/`](file:///d:/Projects/agentic_graphrag/src/graphrag): Baseline 2 (fixed-sequence graph + vector).
 - [`src/agentic_graphrag/`](file:///d:/Projects/agentic_graphrag/src/agentic_graphrag): System under test (LangGraph orchestrator + 7 specialist agents).
 - [`src/benchmark/`](file:///d:/Projects/agentic_graphrag/src/benchmark): LLM-as-a-Judge scoring, metric aggregations, HTML dashboard.
-- [`app.py`](file:///d:/Projects/agentic_graphrag/app.py): Interactive Streamlit 3-panel UI for live demonstrations.
+- [`backend/`](file:///d:/Projects/agentic_graphrag/backend): High-performance FastAPI REST API serving all pipelines, cluster status, and benchmark execution.
+- [`frontend/`](file:///d:/Projects/agentic_graphrag/frontend): Modern React 19 + Vite 8 Single Page Application with interactive SVG subgraphs and LangGraph decision DAGs.
+- [`run_backend.py`](file:///d:/Projects/agentic_graphrag/run_backend.py): Unified server launcher hosting the FastAPI REST API and static React UI.
 
 ```mermaid
 flowchart TD
     subgraph UI ["User & Presentation Layer"]
-        ST["Streamlit UI (app.py)"]
+        REACT["React 19 Frontend (frontend/)"]
+        API["FastAPI REST & Static Server (backend/main.py)"]
         CLI["Benchmark Runner (src/benchmark/runner.py)"]
         HTML["Dashboard Report (results/dashboard.html)"]
     end
@@ -280,11 +283,13 @@ For the agentic pipeline, the system logs:
 
 ## 8. User Interface & Interactive Demo
 
-The Streamlit web application ([`app.py`](file:///d:/Projects/agentic_graphrag/app.py)) provides:
-1. **Interactive Query Console**: Pre-loaded with challenge questions across aggregation, temporal, multi-hop, and superlative categories.
-2. **Three-Panel Parallel Execution**: Real-time display of answers, latencies, and token counts across Naive RAG, Fixed GraphRAG, and Agentic GraphRAG.
-3. **Step-by-Step Investigation Trace**: Expandable visual audit log displaying each orchestrator decision, tool invocation, and evidence fragment.
-4. **Export Engine**: Direct download of raw benchmark JSON results.
+The React 19 + FastAPI web application ([`frontend/`](file:///d:/Projects/agentic_graphrag/frontend), [`backend/main.py`](file:///d:/Projects/agentic_graphrag/backend/main.py)) provides:
+1. **Interactive Investigation Console**: Pre-loaded with challenge questions across aggregation, temporal, multi-hop, and superlative categories.
+2. **Three-Panel Comparative Execution**: Real-time display of answers, latencies, token counts, and live BERTScore metrics across Naive RAG, Fixed GraphRAG, and Agentic GraphRAG.
+3. **Interactive Knowledge Subgraph Visualizer**: Vector-rendered SVG network displaying retrieved Olympic entities, venues, sports, and countries with zoom, pan, and node inspection.
+4. **Step-by-Step LangGraph Decision Trail DAG**: Visual execution trail displaying each orchestrator decision, tool invocation, token consumption, and evidence fragment.
+5. **Autonomous Diagnostics Modal**: One-click verification suite testing TigerGraph Savanna connectivity, LLM API keys, and BERTScore embedding pipelines.
+6. **Benchmark Scorecard & Export Engine**: Direct execution of the held-out benchmark with live progress bar and CSV/JSON export.
 
 ---
 
