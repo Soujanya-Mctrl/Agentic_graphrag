@@ -56,7 +56,8 @@ coverage.xml
 *.db
 
 # Benchmark results / evaluation outputs
-results/
+results/*
+!results/benchmark_results.json
 benchmarks/output/
 
 # macOS / OS files

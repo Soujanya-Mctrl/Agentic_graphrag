@@ -1,0 +1,61 @@
+{
+  "timestamp": 1790610085.1807113,
+  "total_questions": 1,
+  "summary": {},
+  "per_question_results": [
+    {
+      "question_id": "pub-001",
+      "question": "According to the provided corpus, how many biathlon events at the 2018 Winter Olympics had more than 73 competitors?",
+      "qtype": "aggregation",
+      "pipeline": "naive_rag",
+      "pipeline_name": "RAG",
+      "answer": "The provided document snippets do not contain any information about biathlon events at the 2018 Winter Olympics, so I cannot determine how many such events had more than 73 competitors.",
+      "tokens_used": 279,
+      "latency_seconds": 69.037,
+      "evidence_count": 2,
+      "num_steps": 1,
+      "accuracy": null,
+      "completeness": null,
+      "justification": "No gold answer or judge skipped",
+      "bert_precision": null,
+      "bert_recall": null,
+      "bert_f1": null
+    },
+    {
+      "question_id": "pub-001",
+      "question": "According to the provided corpus, how many biathlon events at the 2018 Winter Olympics had more than 73 competitors?",
+      "qtype": "aggregation",
+      "pipeline": "graph_rag",
+      "pipeline_name": "GraphRAG",
+      "answer": "The provided corpus does not contain any information about biathlon events at the 2018 Winter Olympics, so it cannot answer the question.",
+      "tokens_used": 273,
+      "latency_seconds": 0.833,
+      "evidence_count": 2,
+      "num_steps": 1,
+      "accuracy": null,
+      "completeness": null,
+      "justification": "No gold answer or judge skipped",
+      "bert_precision": null,
+      "bert_recall": null,
+      "bert_f1": null
+    },
+    {
+      "question_id": "pub-001",
+      "question": "According to the provided corpus, how many biathlon events at the 2018 Winter Olympics had more than 73 competitors?",
+      "qtype": "aggregation",
+      "pipeline": "agentic_graphrag",
+      "pipeline_name": "Agentic GraphRAG",
+      "answer": "The provided corpus does not contain any information about biathlon events at the 2018 Winter Olympics or the number of competitors in those events, so I cannot determine how many events had more than 73 competitors.",
+      "tokens_used": 7966,
+      "latency_seconds": 10.286,
+      "evidence_count": 16,
+      "num_steps": 8,
+      "accuracy": null,
+      "completeness": null,
+      "justification": "No gold answer or judge skipped",
+      "bert_precision": null,
+      "bert_recall": null,
+      "bert_f1": null
+    }
+  ]
+}
