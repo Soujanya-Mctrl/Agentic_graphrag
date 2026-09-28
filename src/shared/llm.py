@@ -77,29 +77,59 @@ def _call_groq(system: str, prompt: str, max_tokens: int) -> LLMResponse:
     """
     Uses Groq via its OpenAI-compatible endpoint.
     Avoids the native groq SDK which has CLR memory issues on Python 3.13 / Windows.
+    Automatically cascades across models (e.g. gpt-oss-120b -> qwen3.8-27b -> gpt-oss-20b)
+    if a model hits daily token rate limits (HTTP 429).
     """
-    from openai import OpenAI
+    from openai import OpenAI, RateLimitError, APIError
+    import logging
 
     client = OpenAI(
         api_key=CONFIG.groq_api_key,
         base_url="https://api.groq.com/openai/v1",
     )
-    resp = client.chat.completions.create(
-        model=CONFIG.groq_model,
-        max_tokens=max_tokens,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": prompt},
-        ],
-    )
-    msg = resp.choices[0].message
-    choice = msg.content or getattr(msg, "reasoning", None) or ""
-    usage = resp.usage
-    return LLMResponse(
-        text=choice,
-        input_tokens=usage.prompt_tokens if usage else 0,
-        output_tokens=usage.completion_tokens if usage else 0,
-    )
+
+    primary_model = CONFIG.groq_model or "openai/gpt-oss-120b"
+    candidate_models = [primary_model, "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]
+    seen = set()
+    models_to_try = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
+
+    last_error = None
+    for model_name in models_to_try:
+        try:
+            resp = client.chat.completions.create(
+                model=model_name,
+                max_tokens=max_tokens,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": prompt},
+                ],
+            )
+            msg = resp.choices[0].message
+            choice = msg.content or getattr(msg, "reasoning", None) or ""
+            usage = resp.usage
+            return LLMResponse(
+                text=choice,
+                input_tokens=usage.prompt_tokens if usage else 0,
+                output_tokens=usage.completion_tokens if usage else 0,
+            )
+        except (RateLimitError, APIError) as e:
+            err_msg = str(e).lower()
+            status_code = getattr(e, "status_code", None)
+            if status_code == 429 or "rate_limit" in err_msg or "429" in err_msg:
+                logging.getLogger("llm").warning(
+                    "Groq rate limit hit on '%s'. Cascading to next available model...",
+                    model_name,
+                )
+                last_error = e
+                continue
+            raise e
+        except Exception as e:
+            last_error = e
+            break
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("Failed to obtain response from Groq provider")
 
 
 def complete(system: str, prompt: str, max_tokens: int = 1024) -> LLMResponse:

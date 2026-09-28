@@ -165,22 +165,28 @@ def run_all(
 
     total_q = len(questions)
     for idx, q in enumerate(questions):
-        q_eval = run_single_question(
-            q,
-            client,
-            pipelines=pipelines,
-            compute_judge=compute_judge,
-            compute_bert=compute_bert,
-        )
+        try:
+            q_eval = run_single_question(
+                q,
+                client,
+                pipelines=pipelines,
+                compute_judge=compute_judge,
+                compute_bert=compute_bert,
+            )
 
-        for _p_name, row in q_eval["pipeline_results"].items():
-            per_question_results.append(row)
+            for _p_name, row in q_eval["pipeline_results"].items():
+                per_question_results.append(row)
 
-        for _p_name, raw in q_eval["raw_outputs"].items():
-            raw_runs.append(raw)
+            for _p_name, raw in q_eval["raw_outputs"].items():
+                raw_runs.append(raw)
 
-        if progress_callback:
-            progress_callback(idx + 1, total_q, q_eval)
+            if progress_callback:
+                progress_callback(idx + 1, total_q, q_eval)
+        except Exception as q_err:
+            import logging
+            logging.getLogger("benchmark").error("Error on question %s: %s", q.get("id"), q_err)
+            if progress_callback:
+                progress_callback(idx + 1, total_q, {"question": f"Error: {q_err}"})
 
     judged_rows = [r for r in per_question_results if r["accuracy"] is not None]
     summary = metrics.aggregate_scores(judged_rows) if judged_rows else {}

@@ -88,6 +88,7 @@ class BenchmarkState:
         self.total: int = 0
         self.latest_item: Optional[str] = None
         self.latest_results: Optional[Dict[str, Any]] = None
+        self.error: Optional[str] = None
         self.lock = threading.Lock()
 
 benchmark_state = BenchmarkState()
@@ -323,6 +324,7 @@ def start_benchmark(req: BenchmarkStartRequest, background_tasks: BackgroundTask
         benchmark_state.current = 0
         benchmark_state.total = req.sample_size
         benchmark_state.latest_item = "Initializing..."
+        benchmark_state.error = None
 
     def _execute_run():
         def _cb(curr, tot, q_eval):
@@ -344,6 +346,9 @@ def start_benchmark(req: BenchmarkStartRequest, background_tasks: BackgroundTask
                 benchmark_state.latest_results = data
         except Exception as e:
             logger.error("Benchmark background run error: %s", e)
+            with benchmark_state.lock:
+                benchmark_state.error = str(e)
+                benchmark_state.latest_item = f"Error: {e}"
         finally:
             with benchmark_state.lock:
                 benchmark_state.is_running = False
@@ -361,6 +366,7 @@ def get_benchmark_status():
             "current": benchmark_state.current,
             "total": benchmark_state.total,
             "latest_item": benchmark_state.latest_item,
+            "error": benchmark_state.error,
         }
 
 
