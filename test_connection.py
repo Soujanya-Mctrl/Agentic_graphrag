@@ -68,10 +68,10 @@ def test_db_connection():
         token = None
         if secret:
             token = normalize_token(conn.getToken(secret=secret))
-            print("[✓] Successfully minted auth token using TG_SECRET!")
+            print("[+] Successfully minted auth token using TG_SECRET!")
         elif not api_token:
             token = normalize_token(conn.getToken())
-            print("[✓] Successfully fetched auth token!")
+            print("[+] Successfully fetched auth token!")
 
         if token:
             conn = tg.TigerGraphConnection(
@@ -82,13 +82,13 @@ def test_db_connection():
             )
 
         ver = conn.getVer()
-        print(f"[✓] Connected successfully! TigerGraph Version: {ver}")
+        print(f"[+] Connected successfully! TigerGraph Version: {ver}")
 
         if graphname:
             try:
                 vertex_types = conn.getVertexTypes()
                 edge_types = conn.getEdgeTypes()
-                print(f"[✓] Graph '{graphname}' Schema:")
+                print(f"[+] Graph '{graphname}' Schema:")
                 print(f"    Vertex Types: {vertex_types}")
                 print(f"    Edge Types:   {edge_types}")
             except Exception as schema_err:
@@ -99,7 +99,7 @@ def test_db_connection():
         return True
 
     except Exception as e:
-        print(f"[✗] Database connection failed: {e}")
+        print(f"[-] Database connection failed: {e}")
         return False
 
 def test_mcp_availability():
@@ -109,17 +109,19 @@ def test_mcp_availability():
 
     mcp_bin = shutil.which("tigergraph-mcp")
     if not mcp_bin:
-        print("[!] 'tigergraph-mcp' executable not found in PATH.")
-        print("    Install it via: pip install tigergraph-mcp")
-        return False
+        # Check standard user Scripts directory on Windows
+        user_scripts = os.path.expandvars(r"%APPDATA%\Python\Python313\Scripts\tigergraph-mcp.exe")
+        if os.path.exists(user_scripts):
+            mcp_bin = user_scripts
 
-    print(f"[✓] Found tigergraph-mcp at: {mcp_bin}")
+    cmd = [mcp_bin] if mcp_bin else [sys.executable, "-m", "tigergraph_mcp"]
+    print(f"[+] Using MCP runner: {' '.join(cmd)}")
 
     # Test initialization handshake over stdio
     init_payload = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test-client","version":"1.0"}}}\n'
     try:
         process = subprocess.Popen(
-            [mcp_bin],
+            cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -127,7 +129,7 @@ def test_mcp_availability():
         )
         stdout, stderr = process.communicate(input=init_payload, timeout=5)
         if "result" in stdout or "serverInfo" in stdout:
-            print("[✓] tigergraph-mcp JSON-RPC handshake succeeded!")
+            print("[+] tigergraph-mcp JSON-RPC handshake succeeded!")
             print(f"    Server response: {stdout.strip()[:120]}...")
             return True
         else:
@@ -138,7 +140,7 @@ def test_mcp_availability():
         print("[!] Process timed out during initialization handshake.")
         return False
     except Exception as e:
-        print(f"[✗] Failed to run tigergraph-mcp: {e}")
+        print(f"[-] Failed to run tigergraph-mcp: {e}")
         return False
 
 if __name__ == "__main__":
