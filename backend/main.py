@@ -99,7 +99,7 @@ class BenchmarkStartRequest(BaseModel):
 
 
 # ── Routes: Cluster Status & Models ───────────────────────────────────────────
-@app.get("/api/status")
+@app.api_route("/api/status", methods=["GET", "HEAD"])
 def get_system_status():
     """Retrieve TigerGraph Savanna cluster health and LLM gateway status."""
     tg_connected = False
@@ -368,7 +368,13 @@ def get_benchmark_results():
         except Exception as e:
             logger.error("Error reading saved benchmark results: %s", e)
 
-    raise HTTPException(status_code=404, detail="No benchmark results found. Start a benchmark run first.")
+    # Return graceful empty benchmark payload rather than 404 so UI loads without error
+    return {
+        "timestamp": time.time(),
+        "total_questions": 0,
+        "summary": {},
+        "per_question_results": []
+    }
 
 
 # ── Route: Knowledge Graph Schema & Subgraph ───────────────────────────────────
@@ -442,11 +448,58 @@ def run_diagnostics():
     return report.to_dict()
 
 
-# ── Mount Frontend Static Assets ───────────────────────────────────────────────
-dist_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
-if os.path.exists(dist_dir):
+# ── Route: API Root Directory ──────────────────────────────────────────────────
+@app.api_route("/api", methods=["GET", "HEAD"])
+@app.api_route("/api/", methods=["GET", "HEAD"])
+def api_root():
+    """Return JSON catalog of all active API endpoints."""
+    return {
+        "service": "TigerGraph Agentic GraphRAG API",
+        "version": "2.0.0",
+        "status": "online",
+        "swagger_docs": "/docs",
+        "redoc": "/redoc",
+        "endpoints": {
+            "status": "/api/status",
+            "questions": "/api/questions",
+            "investigate": "/api/investigate",
+            "benchmark_start": "/api/benchmark/start",
+            "benchmark_status": "/api/benchmark/status",
+            "benchmark_results": "/api/benchmark/results",
+            "graph_subgraph": "/api/graph/subgraph",
+            "diagnostics": "/api/diagnostics/verify",
+        }
+    }
+
+
+# ── Mount Frontend Static Assets or Root Fallback ──────────────────────────────
+dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+dist_index = os.path.join(dist_dir, "index.html")
+
+if os.path.exists(dist_dir) and os.path.exists(dist_index):
     from fastapi.staticfiles import StaticFiles
     app.mount("/", StaticFiles(directory=dist_dir, html=True), name="frontend")
+else:
+    @app.api_route("/", methods=["GET", "HEAD"])
+    def root():
+        return {
+            "service": "TigerGraph Agentic GraphRAG API",
+            "version": "2.0.0",
+            "status": "online",
+            "swagger_docs": "/docs",
+            "redoc": "/redoc",
+            "endpoints": {
+                "status": "/api/status",
+                "questions": "/api/questions",
+                "investigate": "/api/investigate",
+                "benchmark_start": "/api/benchmark/start",
+                "benchmark_status": "/api/benchmark/status",
+                "benchmark_results": "/api/benchmark/results",
+                "graph_subgraph": "/api/graph/subgraph",
+                "diagnostics": "/api/diagnostics/verify",
+            }
+        }
+
 
 
 if __name__ == "__main__":

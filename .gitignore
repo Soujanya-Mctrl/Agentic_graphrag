@@ -11,8 +11,9 @@ __pycache__/
 *.so
 .Python
 build/
-develop-eggs/
 dist/
+!frontend/dist/
+!frontend/dist/**
 downloads/
 eggs/
 .eggs/
@@ -55,7 +56,8 @@ coverage.xml
 *.db
 
 # Benchmark results / evaluation outputs
-results/
+results/*
+!results/benchmark_results.json
 benchmarks/output/
 
 # macOS / OS files
