@@ -2,10 +2,10 @@
 """
 Ingest the Agentic GraphRAG corpus (corpus.jsonl) into TigerGraph.
 Populates:
-  - Document vertices: id, title, url, text, approx_tokens
-  - Entity vertices: Athletes, Venues, Games, Sports, Countries, Events
-  - MENTIONS edges: Document -> Entity
-  - RELATION edges: Entity -> Entity (HELD_AT, PART_OF_GAMES, WON_GOLD, etc.)
+- Document vertices: id, title, url, text, approx_tokens
+- Entity vertices: Athletes, Venues, Games, Sports, Countries, Events
+- MENTIONS edges: Document -> Entity
+- RELATION edges: Entity -> Entity (HELD_AT, PART_OF_GAMES, WON_GOLD, etc.)
 """
 
 import os
