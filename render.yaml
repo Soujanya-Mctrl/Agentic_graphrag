@@ -5,7 +5,7 @@ services:
     region: oregon
     plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT --limit-max-requests 500"
     healthCheckPath: "/api/status"
     envVars:
       - key: PYTHON_VERSION
@@ -16,6 +16,10 @@ services:
         value: 1
       - key: OMP_NUM_THREADS
         value: 1
+      - key: MALLOC_TRIM_THRESHOLD_
+        value: "65536"
+      - key: USE_MOCK_EMBEDDINGS
+        value: "1"
       - key: LLM_PROVIDER
         value: groq
       - key: GROQ_MODEL

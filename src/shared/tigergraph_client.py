@@ -134,8 +134,8 @@ class TigerGraphClient:
 
         self._corpus_cache: Optional[list[dict[str, Any]]] = None
 
-    def _get_corpus(self) -> list[dict[str, Any]]:
-        """Lazily load local corpus documents as fallback when vectorTopK query is not installed."""
+    def _get_corpus(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Lazily load a small sample of local corpus documents as fallback when live queries fail."""
         if self._corpus_cache is not None:
             return self._corpus_cache
         corpus_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "corpus", "corpus.jsonl")
@@ -143,7 +143,9 @@ class TigerGraphClient:
         if os.path.exists(corpus_path):
             try:
                 with open(corpus_path, "r", encoding="utf-8") as f:
-                    for line in f:
+                    for i, line in enumerate(f):
+                        if i >= limit:
+                            break
                         if line.strip():
                             docs.append(json.loads(line))
             except Exception:
@@ -239,17 +241,16 @@ class TigerGraphClient:
         return results
 
     def vector_search(self, query_embedding: list[float], top_k: int = 8) -> list[dict[str, Any]]:
-        """Vector/document search using installed query or ranked corpus fallback."""
+        """Vector/document search using installed query or live vertex lookup."""
         try:
             return self.conn.runInstalledQuery("vectorTopK", params={"embedding": query_embedding, "k": top_k})
         except Exception:
             pass
 
-        # Fallback to local corpus search
-        corpus = self._get_corpus()
-        if not corpus:
-            try:
-                v_docs = self.conn.getVertices("Document", limit=top_k)
+        # Query live Document vertices directly from Savanna Cloud
+        try:
+            v_docs = self.conn.getVertices("Document", limit=top_k)
+            if v_docs:
                 return [
                     {
                         "doc_id": d["v_id"],
@@ -259,10 +260,11 @@ class TigerGraphClient:
                     }
                     for d in v_docs
                 ]
-            except Exception:
-                return []
+        except Exception:
+            pass
 
-        # Return top_k documents from corpus
+        # Fallback to small sample of local corpus
+        corpus = self._get_corpus(limit=top_k)
         return [
             {
                 "doc_id": d["doc_id"],
@@ -294,9 +296,18 @@ class TigerGraphClient:
         except Exception:
             pass
 
-        for d in self._get_corpus():
-            if d.get("doc_id") == doc_id:
-                return d
+        # Stream file line-by-line without loading 23MB into memory
+        corpus_path = os.path.join(os.path.dirname(__file__), "..", "..", "data", "corpus", "corpus.jsonl")
+        if os.path.exists(corpus_path):
+            try:
+                with open(corpus_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        if doc_id in line:
+                            data = json.loads(line)
+                            if data.get("doc_id") == doc_id:
+                                return data
+            except Exception:
+                pass
         return None
 
 
@@ -349,13 +360,29 @@ class MockTigerGraphClient:
         return self._docs.get(doc_id)
 
 
+_CLIENT_INSTANCE: Optional[TigerGraphClient | MockTigerGraphClient] = None
+
+
 def get_client(force_real: bool = False):
+    """Retrieve or initialize singleton TigerGraph client."""
+    global _CLIENT_INSTANCE
     use_mock = False if force_real else os.getenv("TG_USE_MOCK", str(CONFIG.tg_use_mock)).lower() == "true"
+
+    if _CLIENT_INSTANCE is not None:
+        # If client type matches desired mode, reuse existing instance
+        if use_mock and isinstance(_CLIENT_INSTANCE, MockTigerGraphClient):
+            return _CLIENT_INSTANCE
+        if not use_mock and isinstance(_CLIENT_INSTANCE, TigerGraphClient):
+            return _CLIENT_INSTANCE
+
     if use_mock:
-        return MockTigerGraphClient()
+        _CLIENT_INSTANCE = MockTigerGraphClient()
+        return _CLIENT_INSTANCE
+
     try:
-        return TigerGraphClient()
+        _CLIENT_INSTANCE = TigerGraphClient()
+        return _CLIENT_INSTANCE
     except Exception as e:
-        # If real client fails to authenticate, log warning and fall back to Mock
         print(f"[!] Warning: TigerGraphClient connection failed ({e}). Falling back to MockTigerGraphClient.")
-        return MockTigerGraphClient()
+        _CLIENT_INSTANCE = MockTigerGraphClient()
+        return _CLIENT_INSTANCE

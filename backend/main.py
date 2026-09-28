@@ -20,12 +20,15 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Set thread environment flags early to prevent CPU/memory over-allocation
+# Set thread and memory allocation flags early to prevent CPU/memory over-allocation
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("MALLOC_TRIM_THRESHOLD_", "65536")
+
+import gc
 
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -287,7 +290,7 @@ def run_investigation(req: InvestigateRequest):
             {"source": "Athlete:Chen Ding", "target": "Country:CHN", "label": "REPRESENTS"},
         ]
 
-    return {
+    resp_data = {
         "question": req.question,
         "gold_answer": req.gold_answer,
         "pipelines": results,
@@ -297,6 +300,8 @@ def run_investigation(req: InvestigateRequest):
         },
         "trace_dag": trace_dag,
     }
+    gc.collect()
+    return resp_data
 
 
 # ── Routes: Benchmarking Engine ────────────────────────────────────────────────
@@ -445,7 +450,9 @@ def run_diagnostics():
     """Trigger the autonomous Verification Agent to validate LLM, HF Token, and BERTScore."""
     agent = VerificationAgent(verbose=False)
     report = agent.run_all()
-    return report.to_dict()
+    data = report.to_dict()
+    gc.collect()
+    return data
 
 
 # ── Route: API Root Directory ──────────────────────────────────────────────────
