@@ -25,9 +25,11 @@ An autonomous, goal-driven **Agentic GraphRAG** system powered by **TigerGraph**
   - [2. Automated Three-Way Benchmark Runner](#2-automated-three-way-benchmark-runner)
   - [3. TigerGraph Cloud & MCP Verification](#3-tigergraph-cloud--mcp-verification)
   - [4. Test Suite](#4-offline-smoke--unit-tests)
+- [Production Deployment (Vercel & Render)](#-production-deployment-vercel--render)
 - [Evaluation Methodology](#-evaluation-methodology)
 - [Repository Structure](#-repository-structure)
 - [Submission Deliverables Checklist](#-submission-deliverables-checklist)
+
 
 ---
 
@@ -256,7 +258,22 @@ For every test question across all three pipelines, the system logs and calculat
 
 ---
 
+## 🚀 Production Deployment (Vercel & Render)
+
+The system is configured for decoupled cloud deployment:
+- **Frontend (Vercel)**: Global Edge CDN hosting the React 19 + Vite 8 SPA.
+- **Backend (Render)**: Python 3.11 / FastAPI web service communicating with TigerGraph Savanna Cloud & Groq LLMs.
+
+For detailed step-by-step instructions, see the [Production Deployment Guide](docs/DEPLOYMENT.md).
+
+### Quick Summary:
+1. **Render (Backend)**: Deploy using the pre-configured [`render.yaml`](render.yaml) blueprint or [`Dockerfile`](Dockerfile) with start command `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`.
+2. **Vercel (Frontend)**: Import repo, set root directory to `frontend`, and configure `VITE_API_URL=https://<your-render-service>.onrender.com`.
+
+---
+
 ## 📁 Repository Structure
+
 
 ```
 agentic_graphrag/

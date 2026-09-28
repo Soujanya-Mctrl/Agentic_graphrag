@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Play, FolderOpen, Download, BarChart2, TrendingUp, Zap, Clock, ShieldCheck, CheckCircle } from 'lucide-react';
+import { API_BASE } from '../config';
 
 export default function TabBenchmark() {
   const [dataset, setDataset] = useState("data/questions/eval_public.jsonl");
@@ -12,7 +13,7 @@ export default function TabBenchmark() {
 
   // Automatically try loading existing saved benchmark on mount
   useEffect(() => {
-    fetch('/api/benchmark/results')
+    fetch(`${API_BASE}/api/benchmark/results`)
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data) setBenchmarkData(data);
@@ -26,13 +27,13 @@ export default function TabBenchmark() {
     if (isRunning) {
       interval = setInterval(async () => {
         try {
-          const res = await fetch('/api/benchmark/status');
+          const res = await fetch(`${API_BASE}/api/benchmark/status`);
           const status = await res.json();
           setProgress(status);
           if (!status.is_running && status.current > 0) {
             setIsRunning(false);
             // Fetch completed results
-            const rRes = await fetch('/api/benchmark/results');
+            const rRes = await fetch(`${API_BASE}/api/benchmark/results`);
             if (rRes.ok) {
               const rData = await rRes.json();
               setBenchmarkData(rData);
@@ -50,7 +51,7 @@ export default function TabBenchmark() {
     setIsRunning(true);
     setError(null);
     try {
-      const res = await fetch('/api/benchmark/start', {
+      const res = await fetch(`${API_BASE}/api/benchmark/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -69,7 +70,7 @@ export default function TabBenchmark() {
   const handleLoadSaved = async () => {
     setError(null);
     try {
-      const res = await fetch('/api/benchmark/results');
+      const res = await fetch(`${API_BASE}/api/benchmark/results`);
       if (!res.ok) throw new Error("No saved benchmark results found. Run a benchmark first.");
       const data = await res.json();
       setBenchmarkData(data);

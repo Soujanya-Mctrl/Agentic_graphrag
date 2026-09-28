@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: agentic-graphrag-backend
+    runtime: python
+    region: oregon
+    plan: free
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: "/api/status"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: OPENBLAS_NUM_THREADS
+        value: 1
+      - key: MKL_NUM_THREADS
+        value: 1
+      - key: OMP_NUM_THREADS
+        value: 1
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: TG_TGCLOUD
+        value: "true"
+      - key: TG_USE_MOCK
+        value: "false"
+      - key: TG_HOST
+        sync: false
+      - key: TG_GRAPHNAME
+        sync: false
+      - key: TG_SECRET
+        sync: false
+      - key: TG_USERNAME
+        sync: false
+      - key: TG_PASSWORD
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: HF_TOKEN
+        sync: false

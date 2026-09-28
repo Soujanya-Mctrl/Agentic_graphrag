@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Share2, Filter, Layers, Database } from 'lucide-react';
 import SubgraphVisualizer from './SubgraphVisualizer';
+import { API_BASE } from '../config';
 
 const ALL_TYPES = ["Athlete", "Event", "Games", "Venue", "Sport", "Country"];
 
@@ -12,7 +13,7 @@ export default function TabGraphExplorer() {
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/graph/subgraph?types=${selectedTypes.join(',')}&limit=${maxNodes}`)
+    fetch(`${API_BASE}/api/graph/subgraph?types=${selectedTypes.join(',')}&limit=${maxNodes}`)
       .then(res => res.json())
       .then(data => {
         setGraphData(data);
