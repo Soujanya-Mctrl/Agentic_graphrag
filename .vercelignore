@@ -1,0 +1,16 @@
+# Python backend & ML dependencies (handled by Render)
+requirements.txt
+requirements-dev.txt
+*.py
+backend/
+src/
+data/
+docs/
+results/
+scripts/
+tests/
+Dockerfile
+render.yaml
+.venv/
+__pycache__/
+.pytest_cache/
