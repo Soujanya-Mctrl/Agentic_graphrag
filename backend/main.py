@@ -442,11 +442,34 @@ def run_diagnostics():
     return report.to_dict()
 
 
-# ── Mount Frontend Static Assets ───────────────────────────────────────────────
-dist_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
-if os.path.exists(dist_dir):
+# ── Mount Frontend Static Assets or API Welcome Fallback ───────────────────────
+dist_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"))
+dist_index = os.path.join(dist_dir, "index.html")
+
+if os.path.exists(dist_dir) and os.path.exists(dist_index):
     from fastapi.staticfiles import StaticFiles
     app.mount("/", StaticFiles(directory=dist_dir, html=True), name="frontend")
+else:
+    @app.get("/")
+    def root():
+        return {
+            "service": "TigerGraph Agentic GraphRAG API",
+            "version": "2.0.0",
+            "status": "online",
+            "swagger_docs": "/docs",
+            "redoc": "/redoc",
+            "endpoints": {
+                "status": "/api/status",
+                "questions": "/api/questions",
+                "investigate": "/api/investigate",
+                "benchmark_start": "/api/benchmark/start",
+                "benchmark_status": "/api/benchmark/status",
+                "benchmark_results": "/api/benchmark/results",
+                "graph_subgraph": "/api/graph/subgraph",
+                "diagnostics": "/api/diagnostics/verify",
+            }
+        }
+
 
 
 if __name__ == "__main__":
