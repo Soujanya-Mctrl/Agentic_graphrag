@@ -1,12 +1,14 @@
 # 🐯 Agentic GraphRAG — TigerGraph Hackathon
 
+[![FastAPI](https://img.shields.io/badge/Backend-FastAPI%200.136-009688.svg)](https://fastapi.tiangolo.com/)
+[![React](https://img.shields.io/badge/Frontend-React%2019%20%2B%20Vite%208-61DAFB.svg)](https://react.dev/)
 [![TigerGraph](https://img.shields.io/badge/TigerGraph-Savanna%204.2.5-orange.svg)](https://tgcloud.io/)
 [![LangGraph](https://img.shields.io/badge/Orchestrator-LangGraph-blue.svg)](https://github.com/langchain-ai/langgraph)
-[![Streamlit](https://img.shields.io/badge/UI-Streamlit-red.svg)](https://streamlit.io/)
-[![Tests](https://img.shields.io/badge/Tests-12%2F12%20Passing-brightgreen.svg)]()
+[![Streamlit](https://img.shields.io/badge/Legacy%20UI-Streamlit-red.svg)](https://streamlit.io/)
+[![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)]()
 
-An autonomous, goal-driven **Agentic GraphRAG** system powered by **TigerGraph** and **LangGraph**, benchmarked side-by-side against **Naive RAG** and **Fixed-Sequence GraphRAG** across accuracy, completeness, semantic alignment (BERTScore), latency, and token efficiency.
+An autonomous, goal-driven **Agentic GraphRAG** system powered by **TigerGraph** and **LangGraph**, benchmarked side-by-side against **Naive RAG** and **Fixed-Sequence GraphRAG** across accuracy, completeness, semantic alignment (BERTScore), latency, and token efficiency. Available as a full-featured **React + FastAPI** modern web application.
 
 > **Headline Question:** *When does a complex query require an autonomous, multi-step investigation rather than a single vector or hardcoded graph retrieval?*
 
@@ -20,9 +22,9 @@ An autonomous, goal-driven **Agentic GraphRAG** system powered by **TigerGraph**
 - [Dataset & Knowledge Graph Schema](#-dataset--knowledge-graph-schema)
 - [Getting Started & Installation](#-getting-started--installation)
 - [How to Run](#-how-to-run)
-  - [1. Interactive Streamlit Dashboard](#1-interactive-streamlit-web-dashboard)
-  - [2. Automated Benchmark Runner](#2-automated-three-way-benchmark-runner)
-  - [3. Visual HTML Metrics Dashboard](#3-visual-html-metrics-dashboard)
+  - [1. React + FastAPI Full-Stack Web Application](#1-react--fastapi-full-stack-web-application)
+  - [2. Interactive Streamlit Dashboard (Alternative)](#2-interactive-streamlit-web-dashboard-alternative)
+  - [3. Automated Benchmark Runner](#3-automated-three-way-benchmark-runner)
   - [4. TigerGraph Cloud & MCP Verification](#4-tigergraph-cloud--mcp-verification)
   - [5. Test Suite](#5-offline-smoke--unit-tests)
 - [Evaluation Methodology](#-evaluation-methodology)
@@ -185,16 +187,44 @@ TG_TGCLOUD=true
 
 ## 💻 How to Run
 
-### 1. Interactive Streamlit Web Dashboard
+### 1. React + FastAPI Full-Stack Web Application
 
-Launch the full-featured editorial interface with real-time side-by-side comparison, DAG trace viewer, and subgraph visualizer:
+The project features a cutting-edge **React 19 + FastAPI** architecture with interactive SVG knowledge subgraphs, LangGraph decision trail DAGs, real-time scorecard KPIs, and multi-model Groq LLM selection:
+
+#### Option A: All-in-One Production Server (Recommended)
+Run the FastAPI server which serves both the REST API and the compiled React production frontend on port `8000`:
+
+```powershell
+python run_backend.py
+```
+*Open **`http://localhost:8000`** in your browser.*
+
+#### Option B: Developer Mode with Hot-Reloading
+Run backend and frontend independently for live hot-reloading:
+
+```powershell
+# Terminal 1 — FastAPI Backend (Port 8000)
+python run_backend.py
+
+# Terminal 2 — React Vite Frontend (Port 5173 with auto /api proxy)
+npm --prefix frontend run dev
+```
+*Open **`http://localhost:5173`** in your browser.*
+
+---
+
+### 2. Interactive Streamlit Web Dashboard (Alternative)
+
+If you prefer the classic Streamlit interface, you can still launch `app.py`:
 
 ```powershell
 streamlit run app.py
 ```
 *Open `http://localhost:8501` in your browser.*
 
-### 2. Automated Three-Way Benchmark Runner
+---
+
+### 3. Automated Three-Way Benchmark Runner
 
 Execute all three pipelines across questions, compute LLM-as-a-judge accuracy and BERTScore, and save raw audit runs:
 
@@ -202,15 +232,6 @@ Execute all three pipelines across questions, compute LLM-as-a-judge accuracy an
 python -m src.benchmark.runner
 ```
 Outputs are saved to [`results/benchmark_results.json`](results/benchmark_results.json) and [`results/raw_runs.json`](results/raw_runs.json).
-
-### 3. Visual HTML Metrics Dashboard
-
-Compile the benchmark outputs into a standalone, styled HTML report with Chart.js charts:
-
-```powershell
-python -m src.benchmark.dashboard
-```
-*Open [`results/dashboard.html`](results/dashboard.html) in any browser.*
 
 ### 4. TigerGraph Cloud & MCP Verification
 
