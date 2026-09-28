@@ -92,7 +92,8 @@ def _call_groq(system: str, prompt: str, max_tokens: int) -> LLMResponse:
             {"role": "user", "content": prompt},
         ],
     )
-    choice = resp.choices[0].message.content or ""
+    msg = resp.choices[0].message
+    choice = msg.content or getattr(msg, "reasoning", None) or ""
     usage = resp.usage
     return LLMResponse(
         text=choice,

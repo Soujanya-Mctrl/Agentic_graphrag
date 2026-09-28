@@ -59,7 +59,9 @@ for key in [
     "GROQ_MODEL", "LLM_PROVIDER", "HF_TOKEN", "HUGGINGFACE_HUB_TOKEN",
 ]:
     if hasattr(st, "secrets") and key in st.secrets:
-        os.environ[key] = str(st.secrets[key])
+        val = str(st.secrets[key]).strip()
+        if val and not val.startswith("your_") and "here" not in val.lower():
+            os.environ[key] = val
 
 # ── Custom CSS: Editorial White Theme (Serif + Sans-Serif Font Pairing) ────────
 st.markdown("""
@@ -87,127 +89,25 @@ h1, h2, h3, .serif-title, .serif-quote {
 }
 
 h1 { font-size: 2.35rem !important; margin-bottom: 0.25rem !important; }
-SAMPLE_QUESTIONS = [
-    "Who won the gold medal in the men's 20 kilometres walk athletics event at the Summer Olympics held immediately before 2016?",
-    "Which country won the most gold medals at the 2012 Summer Olympics in Canoeing?",
-    "Who won the gold medal in the event held at Olympic Weightlifting Gymnasium on 20 September 1988?",
-    "According to the corpus, how many biathlon events at the 2018 Winter Olympics had more than 73 competitors?",
-]
 
-selected_sample = st.selectbox("📌 Pick a sample question", ["(type your own below...)"] + SAMPLE_QUESTIONS)
-question = st.text_area(
-    "✏️ Your question",
-    value="" if selected_sample.startswith("(") else selected_sample,
-    height=80,
-    placeholder="Ask something about Olympic events from the corpus..."
-)
+/* Custom badges & cards */
+.pipeline-badge-rag    { background:#f1f5f9; color:#475569; padding:3px 10px; border-radius:6px; font-size:0.8rem; font-weight:600; display:inline-block; }
+.pipeline-badge-graph  { background:#eff6ff; color:#1d4ed8; padding:3px 10px; border-radius:6px; font-size:0.8rem; font-weight:600; display:inline-block; }
+.pipeline-badge-agent  { background:#f0fdf4; color:#15803d; padding:3px 10px; border-radius:6px; font-size:0.8rem; font-weight:600; display:inline-block; }
 
-run_clicked = st.button("🚀 Run Investigation", type="primary", use_container_width=True, disabled=not question.strip())
+.badge { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600; }
+.badge-tg { background:#ea580c; color:#ffffff; font-weight:700; }
 
-# ── Results ─────────────────────────────────────────────────────────────────────
-if run_clicked and question.strip():
-    from src.shared.tigergraph_client import get_client
-    import src.rag.pipeline as naive_rag
-    import src.graphrag.pipeline as graph_rag
-    import src.agentic_graphrag.pipeline as agentic_graphrag
+.hero-subtitle { font-size:1.05rem; color:#475569; line-height:1.6; margin-top:0.25rem; max-width:850px; }
+.white-card { background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:1.2rem; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+.kpi-title { font-size:0.8rem; text-transform:uppercase; letter-spacing:0.05em; color:#64748b; font-weight:600; }
+.kpi-sub { font-size:0.8rem; color:#94a3b8; margin-top:0.25rem; }
 
-    client = get_client()
-
-    results = {}
-    col1, col2, col3 = st.columns(3)
-    cols = {
-        "RAG": col1,
-        "GraphRAG": col2,
-        "Agentic GraphRAG": col3,
-    }
-    placeholders = {}
-
-    for pipeline_name in ["RAG", "GraphRAG", "Agentic GraphRAG"]:
-        with cols[pipeline_name]:
-            badge_cls = {"RAG": "pipeline-badge-rag", "GraphRAG": "pipeline-badge-graph", "Agentic GraphRAG": "pipeline-badge-agent"}[pipeline_name]
-            st.markdown(f'<span class="{badge_cls}">{pipeline_name}</span>', unsafe_allow_html=True)
-            placeholders[pipeline_name] = st.empty()
-            placeholders[pipeline_name].info("⏳ Waiting...")
-
-    # Run selected pipelines
-    pipeline_map = {
-        "RAG": lambda q, c: naive_rag.run(q, c),
-        "GraphRAG": lambda q, c: graph_rag.run(q, c),
-        "Agentic GraphRAG": lambda q, c: agentic_graphrag.run(q, c),
-    }
-
-    for pipeline_name in pipelines_to_run:
-        with cols[pipeline_name]:
-            placeholders[pipeline_name].info(f"🔄 Running {pipeline_name}...")
-
-        t0 = time.time()
-        out = pipeline_map[pipeline_name](question, client)
-        results[pipeline_name] = out
-
-        with cols[pipeline_name]:
-            placeholders[pipeline_name].empty()
-            with placeholders[pipeline_name].container():
-                st.markdown(f'<div class="answer-box">{out["answer"]}</div>', unsafe_allow_html=True)
-                st.caption(f"⏱ {out.get('latency_seconds', time.time()-t0):.2f}s · 🪙 {out.get('tokens_used', 0):,} tokens")
-
-                # Show agentic trace
-                if pipeline_name == "Agentic GraphRAG" and "full_trace" in out:
-                    with st.expander(f"🔬 Investigation Trace ({out.get('num_steps', 0)} steps)"):
-                        for step in out.get("full_trace", []):
-                            action = step.get("action", step.get("source_action", "step"))
-                            content = step.get("content", "")[:180]
-                            st.markdown(f'<div class="trace-step">→ <b>{action}</b>: {content}</div>', unsafe_allow_html=True)
-
-    # ── Metrics Comparison ──────────────────────────────────────────────────────
-    if len(results) > 1:
-        st.divider()
-        st.subheader("📊 Pipeline Comparison")
-
-        pipeline_colors = {
-            "RAG": "#6b7280",
-            "GraphRAG": "#3b82f6",
-            "Agentic GraphRAG": "#22c55e",
-        }
-
-        m1, m2, m3 = st.columns(3)
-        with m1:
-            st.metric("Fastest", min(results, key=lambda k: results[k].get("latency_seconds", 9999)),
-                      delta=None)
-        with m2:
-            st.metric("Fewest Tokens", min(results, key=lambda k: results[k].get("tokens_used", 9999)))
-        with m3:
-            st.metric("Most Evidence", max(results, key=lambda k: results[k].get("evidence_count", 0)))
-
-        # Token bar chart
-        import pandas as pd
-        df_tokens = pd.DataFrame([
-            {"Pipeline": k, "Tokens": v.get("tokens_used", 0), "Latency (s)": v.get("latency_seconds", 0)}
-            for k, v in results.items()
-        ])
-        st.bar_chart(df_tokens.set_index("Pipeline")["Tokens"])
-
-    # ── Download raw outputs ────────────────────────────────────────────────────
-    st.divider()
-    st.download_button(
-        "⬇️ Download Raw Results JSON",
-        data=json.dumps({"question": question, "results": {k: {**v} for k, v in results.items()}}, indent=2, default=str),
-        file_name="pipeline_results.json",
-        mime="application/json",
-    )
-
-elif not run_clicked:
-    # Landing state
-    st.info("👆 Select or type a question above, then click **Run Investigation** to compare all three pipelines.")
-
-    st.divider()
-    st.subheader("📈 How it Works")
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.markdown("**🔎 RAG (Baseline)**\n\nVector similarity search → retrieve relevant text chunks → generate answer. No graph structure used.")
-    with c2:
-        st.markdown("**🕸 GraphRAG**\n\nEntity linking → multi-hop graph traversal → vector search → generate. Graph structure adds relational context.")
-    with c3:
-        st.markdown("**🤖 Agentic GraphRAG**\n\nOrchestrator decides next action based on evidence state. Iterates until confident or max steps reached. Proves *when* agents add value.")
+.answer-box { background:#f8fafc; border-left:4px solid #ea580c; border-radius:6px; padding:1rem 1.25rem; font-size:0.95rem; line-height:1.6; margin-top:0.5rem; }
+.trace-step { background:#f8fafc; border:1px solid #e2e8f0; border-radius:6px; padding:0.6rem 0.85rem; margin-bottom:0.4rem; font-size:0.85rem; color:#334155; font-family:'JetBrains Mono',monospace; }
+.metric-card { background:#ffffff; border:1px solid #e2e8f0; border-radius:10px; padding:1rem; }
+</style>
+""", unsafe_allow_html=True)
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown('<div class="serif-title" style="font-size:1.6rem; color:#ea580c; margin-bottom:0;">🐯 Agentic GraphRAG</div>', unsafe_allow_html=True)
@@ -224,13 +124,14 @@ with st.sidebar:
     default_mock = not any_key
     use_mock = st.toggle("Mock mode (Zero API keys needed)", value=os.getenv("TG_USE_MOCK", str(default_mock)).lower() == "true")
     os.environ["TG_USE_MOCK"] = "true" if use_mock else "false"
+    CONFIG.tg_use_mock = use_mock
 
     max_steps = st.slider("Max agentic investigation steps", min_value=2, max_value=12, value=int(os.getenv("MAX_STEPS", "8")))
     os.environ["MAX_STEPS"] = str(max_steps)
 
     # Determine active provider
     llm_provider = os.getenv("LLM_PROVIDER", "groq" if has_groq else "anthropic" if has_anthropic else "openai")
-    groq_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    groq_model = os.getenv("GROQ_MODEL", CONFIG.groq_model or "openai/gpt-oss-120b")
 
     if has_groq:
         st.markdown(
@@ -256,15 +157,36 @@ with st.sidebar:
 
     if st.button("🔌 Test Savanna Connection", use_container_width=True):
         try:
-            client = get_client()
-            if hasattr(client, "conn"):
-                vc = client.conn.getVertexCount("Document")
-                ec = client.conn.getVertexCount("Entity")
-                st.success(f"✅ Connected to Savanna!\n- Documents: {vc:,}\n- Entities: {ec:,}")
-            else:
-                st.info("ℹ️ Running in Mock Mode (In-Memory Toy Graph Active)")
+            from src.shared.tigergraph_client import TigerGraphClient
+            client = TigerGraphClient()
+            vc = client.conn.getVertexCount("Document")
+            ec = client.conn.getVertexCount("Entity")
+            st.success(f"✅ Connected to Savanna!\n- Documents: {vc:,}\n- Entities: {ec:,}")
         except Exception as e:
             st.error(f"❌ Connection error: {e}")
+
+    st.divider()
+    st.subheader("🧪 Diagnostics Agent")
+    st.caption("Verify LLM Gateway & HF Token BERTScore")
+    if st.button("🤖 Run Verification Agent", use_container_width=True):
+        from src.agentic_graphrag.agents.verification_agent import VerificationAgent
+        with st.spinner("Verification Agent executing checks..."):
+            v_agent = VerificationAgent(verbose=False)
+            rep = v_agent.run_all()
+            if rep.overall_status == "HEALTHY":
+                st.success("🟢 All Systems Healthy!")
+            elif rep.overall_status == "DEGRADED":
+                st.warning("🟡 Operational with Warnings")
+            else:
+                st.error("🔴 Component Failure")
+
+            for chk in rep.checks:
+                icon = "✅" if chk.status == "PASSED" else "⚠️" if chk.status == "WARNING" else "❌"
+                st.markdown(f"**{icon} {chk.name}**: {chk.message}")
+
+            if rep.trial_result:
+                tr = rep.trial_result
+                st.info(f"🎯 **Trial BERTScore F1**: {tr['bert_f1']:.4f} (Precision: {tr['bert_precision']:.4f}, Recall: {tr['bert_recall']:.4f})\n\n*Latency: {tr['latency_seconds']:.2f}s | Tokens: {tr['tokens_used']}*")
 
     st.divider()
     st.markdown("""
@@ -351,7 +273,12 @@ with tab_explore:
         )
 
     if run_single_btn and user_question.strip():
-        client = get_client()
+        try:
+            client = get_client()
+        except Exception as e:
+            st.warning(f"Note: TigerGraph cluster connection notice ({e}). Operating in fallback mode.")
+            from src.shared.tigergraph_client import MockTigerGraphClient
+            client = MockTigerGraphClient()
         gold_ans = sample_map.get(chosen_sample, {}).get("gold_answer", "")
 
         st.divider()

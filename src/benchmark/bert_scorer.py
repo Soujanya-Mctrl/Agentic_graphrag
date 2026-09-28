@@ -34,8 +34,8 @@ def _get_encoder():
 
     try:
         if CONFIG.hf_token:
-            os.environ.setdefault("HF_TOKEN", CONFIG.hf_token)
-            os.environ.setdefault("HUGGINGFACE_HUB_TOKEN", CONFIG.hf_token)
+            os.environ["HF_TOKEN"] = CONFIG.hf_token
+            os.environ["HUGGINGFACE_HUB_TOKEN"] = CONFIG.hf_token
 
         try:
             return SentenceTransformer("all-MiniLM-L6-v2", token=CONFIG.hf_token or None)
