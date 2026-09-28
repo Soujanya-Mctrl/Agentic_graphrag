@@ -94,7 +94,7 @@ flowchart TD
     SPEC --> DataInfra
 ```
 
-For complete state models, topological specifications, and Round 2 temporal extensions, see [`docs/architecture.md`](docs/architecture.md).
+For complete state models, topological specifications, and Round 2 temporal extensions, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
 
@@ -306,7 +306,7 @@ agentic_graphrag/
 | **Three-Way Benchmark** | [`src/benchmark/runner.py`](src/benchmark/runner.py) | ✅ Operational |
 | **Metrics Dashboard** | [`src/benchmark/dashboard.py`](src/benchmark/dashboard.py) → `results/dashboard.html` | ✅ Operational |
 | **Interactive UI Demo** | [`frontend/`](frontend/) (React 19 SPA) & [`backend/`](backend/) (FastAPI REST API) | ✅ Operational |
-| **Architecture Specification** | [`docs/architecture.md`](docs/architecture.md) | ✅ Complete |
+| **Architecture Specification** | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | ✅ Complete |
 | **TigerGraph Ingestion Pipeline** | [`scripts/ingest_corpus.py`](scripts/ingest_corpus.py) | ✅ Complete |
 | **Offline Test Suite** | [`tests/test_harness.py`](tests/test_harness.py) + [`tests/test_bert_score.py`](tests/test_bert_score.py) | ✅ 12/12 Passing |
 | **GitHub Repository** | [`t-azam747/Agentic_graphrag`](https://github.com/t-azam747/Agentic_graphrag.git) | ✅ Active |
