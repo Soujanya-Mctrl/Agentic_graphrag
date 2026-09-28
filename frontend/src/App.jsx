@@ -6,6 +6,7 @@ import TabGraphExplorer from './components/TabGraphExplorer';
 import TabArchitecture from './components/TabArchitecture';
 import DiagnosticsModal from './components/DiagnosticsModal';
 import { Search, Trophy, Share2, Layers } from 'lucide-react';
+import { API_BASE } from './config';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('investigate');
@@ -15,7 +16,7 @@ export default function App() {
 
   // Fetch status on mount
   useEffect(() => {
-    fetch('/api/status')
+    fetch(`${API_BASE}/api/status`)
       .then(res => res.json())
       .then(data => {
         setSystemStatus(data);

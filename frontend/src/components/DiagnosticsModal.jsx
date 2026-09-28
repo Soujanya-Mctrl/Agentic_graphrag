@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, CheckCircle2, AlertTriangle, XCircle, Play, Loader2 } from 'lucide-react';
+import { API_BASE } from '../config';
 
 export default function DiagnosticsModal({ isOpen, onClose }) {
   const [loading, setLoading] = useState(false);
@@ -12,7 +13,7 @@ export default function DiagnosticsModal({ isOpen, onClose }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/diagnostics/verify', { method: 'POST' });
+      const res = await fetch(`${API_BASE}/api/diagnostics/verify`, { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}: Failed to run verification`);
       const data = await res.json();
       setReport(data);

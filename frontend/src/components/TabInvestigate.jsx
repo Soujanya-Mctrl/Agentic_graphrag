@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Play, Sparkles, Clock, Coins, Layers, Target, CheckSquare, Square, AlertCircle } from 'lucide-react';
 import SubgraphVisualizer from './SubgraphVisualizer';
 import DecisionTrailDag from './DecisionTrailDag';
+import { API_BASE } from '../config';
 
 export default function TabInvestigate({ activeModel }) {
   const [questions, setQuestions] = useState([]);
@@ -16,7 +17,7 @@ export default function TabInvestigate({ activeModel }) {
 
   // Fetch sample questions from backend on mount
   useEffect(() => {
-    fetch('/api/questions?limit=25')
+    fetch(`${API_BASE}/api/questions?limit=25`)
       .then(res => res.json())
       .then(data => {
         setQuestions(data);
@@ -52,7 +53,7 @@ export default function TabInvestigate({ activeModel }) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/investigate', {
+      const res = await fetch(`${API_BASE}/api/investigate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
