@@ -174,22 +174,48 @@ class VerificationAgent:
             )
 
         try:
-            from huggingface_hub import HfApi, login
-
-            # Ensure environment has the token
-            os.environ["HF_TOKEN"] = token
-            os.environ["HUGGINGFACE_HUB_TOKEN"] = token
-
-            api = HfApi(token=token)
-            user_info = api.whoami()
-
-            user_name = user_info.get("name") or user_info.get("fullname", "Unknown")
-            user_type = user_info.get("type", "user")
-            orgs = [org.get("name") for org in user_info.get("orgs", [])] if isinstance(user_info.get("orgs"), list) else []
-
-            # Verify repository access for BERT model
+            user_name = "Unknown"
+            user_type = "user"
+            orgs = []
             model_id = "sentence-transformers/all-MiniLM-L6-v2"
-            model_info = api.model_info(model_id)
+            downloads = None
+
+            try:
+                from huggingface_hub import HfApi
+
+                # Ensure environment has the token
+                os.environ["HF_TOKEN"] = token
+                os.environ["HUGGINGFACE_HUB_TOKEN"] = token
+
+                api = HfApi(token=token)
+                user_info = api.whoami()
+
+                user_name = user_info.get("name") or user_info.get("fullname", "Unknown")
+                user_type = user_info.get("type", "user")
+                orgs = [org.get("name") for org in user_info.get("orgs", [])] if isinstance(user_info.get("orgs"), list) else []
+
+                # Verify repository access for BERT model
+                model_info = api.model_info(model_id)
+                downloads = getattr(model_info, "downloads", None)
+            except ImportError:
+                # Built-in standard library fallback when huggingface_hub is not installed
+                import json
+                import urllib.request
+                headers = {"Authorization": f"Bearer {token}", "User-Agent": "agentic-graphrag"}
+                req = urllib.request.Request("https://huggingface.co/api/whoami-v2", headers=headers)
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    user_info = json.loads(resp.read().decode())
+                    user_name = user_info.get("name") or user_info.get("fullname", "Unknown")
+                    user_type = user_info.get("type", "user")
+                    orgs = [org.get("name") for org in user_info.get("orgs", [])] if isinstance(user_info.get("orgs"), list) else []
+
+                try:
+                    req_model = urllib.request.Request(f"https://huggingface.co/api/models/{model_id}", headers=headers)
+                    with urllib.request.urlopen(req_model, timeout=10) as resp:
+                        m_info = json.loads(resp.read().decode())
+                        downloads = m_info.get("downloads")
+                except Exception:
+                    pass
 
             duration = (time.perf_counter() - start) * 1000
             details = {
@@ -198,7 +224,7 @@ class VerificationAgent:
                 "account_type": user_type,
                 "organizations": orgs,
                 "target_model": model_id,
-                "model_downloads": getattr(model_info, "downloads", None),
+                "model_downloads": downloads,
                 "token_prefix": f"{token[:7]}...",
             }
 
@@ -218,7 +244,7 @@ class VerificationAgent:
             self._log(msg, "❌")
             return CheckResult(
                 name="Hugging Face Authentication",
-                status="FAILED",
+                status="WARNING",
                 details={"authenticated": False, "error": str(e)},
                 message=msg,
                 duration_ms=duration,

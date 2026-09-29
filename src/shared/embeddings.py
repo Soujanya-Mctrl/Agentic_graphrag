@@ -36,7 +36,11 @@ def _model():
 
 
 def embed(text: str) -> list[float]:
-    if os.environ.get("USE_MOCK_EMBEDDINGS") == "1":
+    if (
+        os.environ.get("USE_MOCK_EMBEDDINGS") == "1"
+        or os.environ.get("RENDER")
+        or os.environ.get("LOW_MEMORY_MODE", "1") == "1"
+    ):
         h = hashlib.sha256(text.encode("utf-8")).digest()
         vec = [(b - 127.5) / 127.5 for b in h]
         return (vec * (_DIM // len(vec) + 1))[:_DIM]

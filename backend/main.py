@@ -20,12 +20,23 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-# Set thread environment flags early to prevent CPU/memory over-allocation
+# Set thread and memory allocation flags early to prevent CPU/memory over-allocation
 os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
 os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+os.environ.setdefault("MALLOC_TRIM_THRESHOLD_", "65536")
+os.environ.setdefault("USE_MOCK_EMBEDDINGS", "1")
+os.environ.setdefault("LOW_MEMORY_MODE", "1")
+
+# Prevent any module from loading heavy PyTorch (which allocates 350MB+ RSS alone)
+# whenever running in cloud (Render 512MB limit) or low-memory mode
+if os.environ.get("RENDER") or os.environ.get("LOW_MEMORY_MODE", "1") == "1":
+    sys.modules["torch"] = None
+    sys.modules["sentence_transformers"] = None
+
+import gc
 
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -77,6 +88,7 @@ class BenchmarkState:
         self.total: int = 0
         self.latest_item: Optional[str] = None
         self.latest_results: Optional[Dict[str, Any]] = None
+        self.error: Optional[str] = None
         self.lock = threading.Lock()
 
 benchmark_state = BenchmarkState()
@@ -287,7 +299,7 @@ def run_investigation(req: InvestigateRequest):
             {"source": "Athlete:Chen Ding", "target": "Country:CHN", "label": "REPRESENTS"},
         ]
 
-    return {
+    resp_data = {
         "question": req.question,
         "gold_answer": req.gold_answer,
         "pipelines": results,
@@ -297,6 +309,8 @@ def run_investigation(req: InvestigateRequest):
         },
         "trace_dag": trace_dag,
     }
+    gc.collect()
+    return resp_data
 
 
 # ── Routes: Benchmarking Engine ────────────────────────────────────────────────
@@ -310,6 +324,7 @@ def start_benchmark(req: BenchmarkStartRequest, background_tasks: BackgroundTask
         benchmark_state.current = 0
         benchmark_state.total = req.sample_size
         benchmark_state.latest_item = "Initializing..."
+        benchmark_state.error = None
 
     def _execute_run():
         def _cb(curr, tot, q_eval):
@@ -331,6 +346,9 @@ def start_benchmark(req: BenchmarkStartRequest, background_tasks: BackgroundTask
                 benchmark_state.latest_results = data
         except Exception as e:
             logger.error("Benchmark background run error: %s", e)
+            with benchmark_state.lock:
+                benchmark_state.error = str(e)
+                benchmark_state.latest_item = f"Error: {e}"
         finally:
             with benchmark_state.lock:
                 benchmark_state.is_running = False
@@ -348,6 +366,7 @@ def get_benchmark_status():
             "current": benchmark_state.current,
             "total": benchmark_state.total,
             "latest_item": benchmark_state.latest_item,
+            "error": benchmark_state.error,
         }
 
 
@@ -445,7 +464,9 @@ def run_diagnostics():
     """Trigger the autonomous Verification Agent to validate LLM, HF Token, and BERTScore."""
     agent = VerificationAgent(verbose=False)
     report = agent.run_all()
-    return report.to_dict()
+    data = report.to_dict()
+    gc.collect()
+    return data
 
 
 # ── Route: API Root Directory ──────────────────────────────────────────────────

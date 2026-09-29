@@ -16,9 +16,15 @@ import math
 from typing import Any, Dict, List, Optional, Tuple
 
 import networkx as nx
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
+
+try:
+    import pandas as pd
+    import plotly.express as px
+    import plotly.graph_objects as go
+except ImportError:
+    pd = None
+    px = None
+    go = None
 
 # ── Color Palettes (White Theme / Editorial) ──────────────────────────────────
 PIPELINE_COLORS = {

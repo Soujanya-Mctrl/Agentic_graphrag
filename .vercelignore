@@ -1,0 +1,21 @@
+# Python backend & ML dependencies (handled by Render)
+# Use leading slash / to anchor to root so frontend/src is not ignored!
+/requirements.txt
+/requirements-dev.txt
+/*.py
+/backend/
+/src/
+/data/
+/docs/
+/results/
+/scripts/
+/tests/
+/Dockerfile
+/render.yaml
+/.venv/
+/__pycache__/
+/.pytest_cache/
+
+# Never ignore anything in frontend
+!/frontend/
+!/frontend/**

@@ -30,13 +30,18 @@ export default function TabBenchmark() {
           const res = await fetch(`${API_BASE}/api/benchmark/status`);
           const status = await res.json();
           setProgress(status);
-          if (!status.is_running && status.current > 0) {
+
+          if (status.error) {
+            setError(status.error);
             setIsRunning(false);
-            // Fetch completed results
-            const rRes = await fetch(`${API_BASE}/api/benchmark/results`);
-            if (rRes.ok) {
-              const rData = await rRes.json();
-              setBenchmarkData(rData);
+          } else if (!status.is_running) {
+            setIsRunning(false);
+            if (status.current > 0) {
+              const rRes = await fetch(`${API_BASE}/api/benchmark/results`);
+              if (rRes.ok) {
+                const rData = await rRes.json();
+                setBenchmarkData(rData);
+              }
             }
           }
         } catch (e) {
@@ -167,6 +172,12 @@ export default function TabBenchmark() {
             <FolderOpen size={16} /> Load Saved Results
           </button>
         </div>
+
+        {error && (
+          <div style={{ marginTop: '1.2rem', padding: '0.8rem 1.2rem', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 'var(--radius-md)', color: '#991b1b', fontSize: '0.88rem' }}>
+            ⚠️ <b>Benchmark Alert:</b> {error}
+          </div>
+        )}
 
         {/* Live Progress Bar */}
         {isRunning && (
