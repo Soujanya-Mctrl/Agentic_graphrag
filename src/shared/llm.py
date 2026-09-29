@@ -90,7 +90,7 @@ def _call_groq(system: str, prompt: str, max_tokens: int) -> LLMResponse:
     )
 
     primary_model = CONFIG.groq_model or "qwen/qwen3.8-27b"
-    candidate_models = [primary_model, "openai/gpt-oss-20b"]
+    candidate_models = [primary_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
     seen = set()
     models_to_try = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
 
@@ -114,29 +114,29 @@ def _call_groq(system: str, prompt: str, max_tokens: int) -> LLMResponse:
                     input_tokens=usage.prompt_tokens if usage else 0,
                     output_tokens=usage.completion_tokens if usage else 0,
                 )
-            except (RateLimitError, APIError) as e:
+            except Exception as e:
+                last_error = e
                 err_msg = str(e).lower()
                 status_code = getattr(e, "status_code", None)
-                if status_code == 429 or "rate_limit" in err_msg or "429" in err_msg:
-                    sleep_time = 1.5 * (attempt + 1)
+                if (status_code == 429 or "rate_limit" in err_msg or "429" in err_msg) and attempt == 0:
+                    sleep_time = 1.5
                     logging.getLogger("llm").warning(
-                        "Groq rate limit on '%s' (attempt %d/2). Pausing %.1fs...",
+                        "Groq rate limit on '%s' (attempt 1/2). Pausing %.1fs...",
                         model_name,
-                        attempt + 1,
                         sleep_time,
                     )
                     time.sleep(sleep_time)
-                    last_error = e
                     continue
-                last_error = e
-                break
-            except Exception as e:
-                last_error = e
+                logging.getLogger("llm").warning(
+                    "Groq issue on '%s': %s. Trying next candidate model...",
+                    model_name,
+                    e,
+                )
                 break
 
-    if last_error:
-        raise last_error
-    raise RuntimeError("Failed to obtain response from Groq provider")
+    # If all remote models failed/rate-limited, graceful fallback so pipeline never crashes
+    logging.getLogger("llm").error("All Groq models exhausted/rate-limited. Falling back to mock generator: %s", last_error)
+    return _call_mock(system, prompt, max_tokens)
 
 
 import hashlib

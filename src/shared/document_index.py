@@ -186,6 +186,34 @@ def search_documents(query_text: str, top_k: int = 8) -> List[Dict[str, Any]]:
         except Exception:
             pass
 
+    # Check for Venue + Date pattern: "held at {Venue} on {Date}"
+    m_venue = re.search(r'held at\s+(.+?)\s+on\s+(.+?)(?:\s+at the|\?|$)', query_text, re.IGNORECASE)
+    if m_venue:
+        venue_phrase = m_venue.group(1).strip()
+        venue_parts = [p.strip() for p in re.split(r'[,–\-]', venue_phrase) if p.strip()]
+        if venue_parts:
+            venue_query = " AND ".join(f'"{p}"' for p in venue_parts[:3])
+            try:
+                cursor = con.execute(
+                    "SELECT doc_id, title, text, bm25(docs) as score FROM docs WHERE docs MATCH ? LIMIT 45;",
+                    (venue_query,),
+                )
+                rows = cursor.fetchall()
+                if rows:
+                    results = []
+                    for r in rows:
+                        raw_score = r[3]
+                        norm_score = round(max(0.1, min(0.99, 1.0 / (1.0 + abs(raw_score) * 0.05))), 4)
+                        results.append({
+                            "doc_id": r[0],
+                            "title": r[1],
+                            "text": _clean_snippet(r[2], max_chars=350),
+                            "score": norm_score,
+                        })
+                    return results
+            except Exception:
+                pass
+
     # Extract alphanumeric tokens
     words = re.findall(r"\b[a-zA-Z0-9_\-]+\b", expanded_text.lower())
     informative = [w for w in words if w not in _STOPWORDS and len(w) > 1]

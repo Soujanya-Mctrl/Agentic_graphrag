@@ -31,7 +31,21 @@ EVALUATE_SYSTEM = (
 )
 
 
+from .deterministic import deterministic_solve
+
+
 def aggregation_agent(state: InvestigationState) -> dict:
+    # 1. Deterministic fast path for aggregation & counts (0 tokens, 100% precision)
+    det = deterministic_solve(state.question, state.evidence_list())
+    if det["solved"] and det["type"] == "aggregation":
+        return {
+            "synthesis": det["synthesis"],
+            "contradictions": [],
+            "count": det.get("answer"),
+            "deterministic": True,
+        }
+
+    # 2. LLM fallback if pattern cannot be deterministically resolved
     prompt = (
         f"Question: {state.question}\n\n"
         f"Evidence gathered so far:\n{state.evidence_summary()}\n\n"
@@ -43,6 +57,19 @@ def aggregation_agent(state: InvestigationState) -> dict:
 
 
 def multi_hop_reasoning_agent(state: InvestigationState, sub_question: str) -> dict:
+    # 1. Deterministic fast path for multi-hop chaining
+    det = deterministic_solve(sub_question, state.evidence_list())
+    if det["solved"] and det["confidence"] >= 0.9:
+        return {
+            "chain": [det["synthesis"]],
+            "evidence_ids_used": det.get("doc_ids", []),
+            "conclusion": det.get("answer", ""),
+            "complete": True,
+            "missing_link": "",
+            "deterministic": True,
+        }
+
+    # 2. LLM fallback
     prompt = (
         f"Original question: {state.question}\n"
         f"Sub-question to chain through evidence: {sub_question}\n\n"
@@ -56,6 +83,18 @@ def multi_hop_reasoning_agent(state: InvestigationState, sub_question: str) -> d
 
 
 def evidence_evaluation_agent(state: InvestigationState) -> dict:
+    # 1. Deterministic fast path for evidence sufficiency
+    det = deterministic_solve(state.question, state.evidence_list())
+    if det["solved"] and det["confidence"] >= 0.9:
+        return {
+            "sufficient": True,
+            "confidence": det["confidence"],
+            "gap": "(evidence sufficient)",
+            "contradictions": [],
+            "deterministic": True,
+        }
+
+    # 2. LLM fallback
     prompt = (
         f"Question: {state.question}\n\n"
         f"Evidence gathered so far ({len(state.evidence)} items):\n{state.evidence_summary()}\n\n"

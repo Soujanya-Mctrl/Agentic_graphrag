@@ -95,6 +95,9 @@ def _orchestrate_prompt(inv: InvestigationState) -> str:
     )
 
 
+from .deterministic import deterministic_solve
+
+
 # ── Node: orchestrate ──────────────────────────────────────────────────────────
 def orchestrate(state: GraphState) -> GraphState:
     """LLM decides the next action. Writes next_action / next_input / rationale."""
@@ -103,6 +106,34 @@ def orchestrate(state: GraphState) -> GraphState:
     # Force stop if step limit hit
     if inv.should_force_stop(CONFIG.max_investigation_steps):
         return {**state, "next_action": "answer", "next_input": {}, "rationale": "max_steps_reached"}
+
+    # 0. Deterministic fast-path: if no evidence has been collected yet, start with vector_search
+    if not inv.evidence and not inv.steps:
+        step = InvestigationStep(
+            step_index=0,
+            action=ActionType.VECTOR_SEARCH,
+            action_input={"query_text": inv.question},
+            rationale="Initial retrieval over documents and knowledge graph",
+            tokens_used=0,
+        )
+        inv.record_step(step)
+        return {
+            **state,
+            "next_action": "vector_search",
+            "next_input": {"query_text": inv.question},
+            "rationale": "Initial retrieval over documents and knowledge graph",
+        }
+
+    # 1. Deterministic fast-path: if evidence already solves the question with high confidence
+    det = deterministic_solve(inv.question, inv.evidence_list())
+    if det["solved"] and det["confidence"] >= 0.9:
+        inv.final_confidence = det["confidence"]
+        return {
+            **state,
+            "next_action": "answer",
+            "next_input": {},
+            "rationale": f"Deterministic ground truth verified ({det['type']}): {det['answer']}",
+        }
 
     parsed, resp = complete_json(ORCHESTRATOR_SYSTEM, _orchestrate_prompt(inv))
     action   = parsed.get("action", "evaluate_evidence")
@@ -201,19 +232,44 @@ def node_evaluate_evidence(state: GraphState) -> GraphState:
 
 # ── Terminal node: finalize ────────────────────────────────────────────────────
 def node_finalize(state: GraphState) -> GraphState:
-    """Generate the final answer from accumulated evidence, then stop."""
+    """Generate the final answer combining deterministic verification and LLM inference."""
     inv = state["inv"]
-    system = (
-        "You are an expert QA assistant for Olympic sports queries. "
-        "Answer the question using the provided evidence concisely and directly. "
-        "State the exact person name, number, or event title clearly as the main answer. "
-        "Cite the evidence doc_id inline like [Q12345]. "
-        "If evidence is insufficient, state what is missing rather than guessing."
-    )
-    prompt = f"Question: {inv.question}\n\nEvidence:\n{inv.evidence_summary()}\n\nAnswer:"
-    resp = complete(system, prompt)
-    inv.total_tokens += resp.total_tokens
-    inv.final_answer = resp.text.strip()
+    det = deterministic_solve(inv.question, inv.evidence_list())
+
+    if det["solved"] and det["confidence"] >= 0.9:
+        system = (
+            "You are an expert QA assistant for Olympic sports queries. "
+            "You are provided with a verified deterministic calculation and evidence snippet. "
+            "Answer the question concisely and directly stating the exact verified answer and citing the doc_id. "
+            "Never contradict the verified facts."
+        )
+        prompt = (
+            f"Question: {inv.question}\n\n"
+            f"Verified Ground Truth: {det['synthesis']}\n\n"
+            f"Target Answer: {det['answer']}\n"
+            f"Citations: {', '.join('[' + d + ']' for d in det['doc_ids'])}\n\n"
+            "State the final answer directly with citations:"
+        )
+        try:
+            resp = complete(system, prompt, max_tokens=150)
+            inv.total_tokens += resp.total_tokens
+            inv.final_answer = resp.text.strip()
+        except Exception:
+            inv.final_answer = det["synthesis"]
+        inv.final_confidence = det["confidence"]
+    else:
+        system = (
+            "You are an expert QA assistant for Olympic sports queries. "
+            "Answer the question using the provided evidence concisely and directly. "
+            "State the exact person name, number, or event title clearly as the main answer. "
+            "Cite the evidence doc_id inline like [Q12345]. "
+            "If evidence is insufficient, state what is missing rather than guessing."
+        )
+        prompt = f"Question: {inv.question}\n\nEvidence:\n{inv.evidence_summary()}\n\nAnswer:"
+        resp = complete(system, prompt)
+        inv.total_tokens += resp.total_tokens
+        inv.final_answer = resp.text.strip()
+
     inv.stopped = True
     inv.stop_reason = inv.stop_reason or "answered"
     return {**state, "inv": inv}
