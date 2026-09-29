@@ -232,27 +232,50 @@ def node_evaluate_evidence(state: GraphState) -> GraphState:
 
 # ── Terminal node: finalize ────────────────────────────────────────────────────
 def node_finalize(state: GraphState) -> GraphState:
-    """Generate the final answer combining deterministic verification and LLM inference."""
+    """Generate the final answer combining deterministic verification, retrieved evidence, and LLM inference."""
     inv = state["inv"]
     det = deterministic_solve(inv.question, inv.evidence_list())
 
-    if det["solved"] and det["confidence"] >= 0.9:
-        citations_str = f"\n\nCitations: {', '.join('[' + d + ']' for d in det['doc_ids'])}" if det.get("doc_ids") else ""
-        inv.final_answer = f"{det['answer']}. {det['synthesis']}{citations_str}"
-        inv.final_confidence = det["confidence"]
-    else:
-        system = (
-            "You are an expert QA assistant for Olympic sports queries. "
-            "Answer the question using the provided evidence concisely and directly. "
-            "State the exact person name, number, or event title clearly as the main answer. "
-            "Cite the evidence doc_id inline like [Q12345]. "
-            "If evidence is insufficient, state what is missing rather than guessing."
-        )
-        prompt = f"Question: {inv.question}\n\nEvidence:\n{inv.evidence_summary()}\n\nAnswer:"
-        resp = complete(system, prompt)
-        inv.total_tokens += resp.total_tokens
-        inv.final_answer = resp.text.strip()
+    system = (
+        "You are an expert Olympic sports knowledge assistant. "
+        "Answer the question clearly, concisely, and factually based on the provided evidence. "
+        "Begin your answer directly with the primary result (e.g., '5' or the athlete's name), "
+        "cite the relevant source doc_ids in brackets like [Q12345], "
+        "and provide a concise explanation of the relevant facts."
+    )
 
+    if det["solved"] and det["confidence"] >= 0.9:
+        tool_facts = (
+            f"Symbolic Tool Calculation:\n"
+            f"- Target Answer: {det['answer']}\n"
+            f"- Facts: {det['synthesis']}\n"
+            f"- Citations: {', '.join('[' + d + ']' for d in det['doc_ids'])}"
+        )
+        prompt = (
+            f"Question: {inv.question}\n\n"
+            f"{tool_facts}\n\n"
+            "State the final answer clearly starting with the verified answer:"
+        )
+    else:
+        prompt = (
+            f"Question: {inv.question}\n\n"
+            f"Retrieved Evidence:\n{inv.evidence_summary()}\n\n"
+            "State the final answer clearly with citations:"
+        )
+
+    try:
+        resp = complete(system, prompt, max_tokens=300)
+        inv.total_tokens += resp.total_tokens
+        ans = resp.text.strip()
+        if det["solved"] and det["answer"] and not ans.lower().startswith(str(det["answer"]).lower()):
+            ans = f"{det['answer']}. {ans}"
+        inv.final_answer = ans
+    except Exception as e:
+        logger.warning("LLM generation failed (%s), using tool fallback", e)
+        citations_str = f"\n\nCitations: {', '.join('[' + d + ']' for d in det['doc_ids'])}" if det.get("doc_ids") else ""
+        inv.final_answer = f"{det['answer']}. {det['synthesis']}{citations_str}" if det["solved"] else "Unable to answer."
+
+    inv.final_confidence = det["confidence"] if det["solved"] else 0.85
     inv.stopped = True
     inv.stop_reason = inv.stop_reason or "answered"
     return {**state, "inv": inv}
