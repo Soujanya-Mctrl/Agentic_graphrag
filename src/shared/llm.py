@@ -6,7 +6,7 @@ the benchmark's efficiency metric is never missed.
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, Optional
 
 from src.shared.config import CONFIG
 

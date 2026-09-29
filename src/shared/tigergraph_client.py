@@ -9,12 +9,15 @@ are set — nothing else in the codebase changes.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import re
 from typing import Any, Optional
 
 from dotenv import dotenv_values, load_dotenv
 from .config import CONFIG
+
+logger = logging.getLogger(__name__)
 
 
 def _normalize_token(token_value):
