@@ -77,77 +77,168 @@ def _call_groq(system: str, prompt: str, max_tokens: int) -> LLMResponse:
     """
     Uses Groq via its OpenAI-compatible endpoint.
     Avoids the native groq SDK which has CLR memory issues on Python 3.13 / Windows.
-    Automatically cascades across models (e.g. gpt-oss-120b -> qwen3.8-27b -> gpt-oss-20b)
-    if a model hits daily token rate limits (HTTP 429).
+    Automatically handles rate limits with exponential backoff and cascading
+    across models (e.g. gpt-oss-120b -> qwen3.8-27b -> gpt-oss-20b).
     """
     from openai import OpenAI, RateLimitError, APIError
     import logging
+    import time
 
     client = OpenAI(
         api_key=CONFIG.groq_api_key,
         base_url="https://api.groq.com/openai/v1",
     )
 
-    primary_model = CONFIG.groq_model or "openai/gpt-oss-120b"
-    candidate_models = [primary_model, "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]
+    primary_model = CONFIG.groq_model or "qwen/qwen3.8-27b"
+    candidate_models = [primary_model, "openai/gpt-oss-20b"]
     seen = set()
     models_to_try = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
 
     last_error = None
     for model_name in models_to_try:
-        try:
-            resp = client.chat.completions.create(
-                model=model_name,
-                max_tokens=max_tokens,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": prompt},
-                ],
-            )
-            msg = resp.choices[0].message
-            choice = msg.content or getattr(msg, "reasoning", None) or ""
-            usage = resp.usage
-            return LLMResponse(
-                text=choice,
-                input_tokens=usage.prompt_tokens if usage else 0,
-                output_tokens=usage.completion_tokens if usage else 0,
-            )
-        except (RateLimitError, APIError) as e:
-            err_msg = str(e).lower()
-            status_code = getattr(e, "status_code", None)
-            if status_code == 429 or "rate_limit" in err_msg or "429" in err_msg:
-                logging.getLogger("llm").warning(
-                    "Groq rate limit hit on '%s'. Cascading to next available model...",
-                    model_name,
+        for attempt in range(2):
+            try:
+                resp = client.chat.completions.create(
+                    model=model_name,
+                    max_tokens=max_tokens,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": prompt},
+                    ],
                 )
+                msg = resp.choices[0].message
+                choice = msg.content or getattr(msg, "reasoning", None) or ""
+                usage = resp.usage
+                return LLMResponse(
+                    text=choice,
+                    input_tokens=usage.prompt_tokens if usage else 0,
+                    output_tokens=usage.completion_tokens if usage else 0,
+                )
+            except (RateLimitError, APIError) as e:
+                err_msg = str(e).lower()
+                status_code = getattr(e, "status_code", None)
+                if status_code == 429 or "rate_limit" in err_msg or "429" in err_msg:
+                    sleep_time = 1.5 * (attempt + 1)
+                    logging.getLogger("llm").warning(
+                        "Groq rate limit on '%s' (attempt %d/2). Pausing %.1fs...",
+                        model_name,
+                        attempt + 1,
+                        sleep_time,
+                    )
+                    time.sleep(sleep_time)
+                    last_error = e
+                    continue
                 last_error = e
-                continue
-            raise e
-        except Exception as e:
-            last_error = e
-            break
+                break
+            except Exception as e:
+                last_error = e
+                break
 
     if last_error:
         raise last_error
     raise RuntimeError("Failed to obtain response from Groq provider")
 
 
+import hashlib
+import os
+import sqlite3
+import threading
+import time
+
+_CACHE_DB_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "data", "llm_cache.db")
+_CACHE_LOCK = threading.Lock()
+_CACHE_CON = None
+_LAST_REQUEST_TIME = 0.0
+
+
+def _get_cache_db():
+    global _CACHE_CON
+    if _CACHE_CON is None:
+        with _CACHE_LOCK:
+            if _CACHE_CON is None:
+                os.makedirs(os.path.dirname(_CACHE_DB_PATH), exist_ok=True)
+                con = sqlite3.connect(_CACHE_DB_PATH, check_same_thread=False)
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS cache (
+                        key TEXT PRIMARY KEY,
+                        text TEXT,
+                        input_tokens INT,
+                        output_tokens INT,
+                        created_at REAL
+                    );
+                """)
+                con.commit()
+                _CACHE_CON = con
+    return _CACHE_CON
+
+
+def _lookup_cache(key: str) -> Optional[LLMResponse]:
+    if os.getenv("DISABLE_LLM_CACHE") == "1":
+        return None
+    try:
+        con = _get_cache_db()
+        with _CACHE_LOCK:
+            row = con.execute("SELECT text, input_tokens, output_tokens FROM cache WHERE key = ?;", (key,)).fetchone()
+            if row:
+                return LLMResponse(text=row[0], input_tokens=row[1], output_tokens=row[2])
+    except Exception:
+        pass
+    return None
+
+
+def _save_cache(key: str, resp: LLMResponse):
+    if os.getenv("DISABLE_LLM_CACHE") == "1":
+        return
+    try:
+        con = _get_cache_db()
+        with _CACHE_LOCK:
+            con.execute(
+                "INSERT OR REPLACE INTO cache(key, text, input_tokens, output_tokens, created_at) VALUES (?, ?, ?, ?, ?);",
+                (key, resp.text, resp.input_tokens, resp.output_tokens, time.time())
+            )
+            con.commit()
+    except Exception:
+        pass
+
+
+def _rate_limit_throttle(min_interval: float = 1.0):
+    """Gentle throttle to stay comfortably below Groq's 30 RPM limit."""
+    global _LAST_REQUEST_TIME
+    with _CACHE_LOCK:
+        now = time.time()
+        elapsed = now - _LAST_REQUEST_TIME
+        if elapsed < min_interval:
+            time.sleep(min_interval - elapsed)
+        _LAST_REQUEST_TIME = time.time()
+
+
 def complete(system: str, prompt: str, max_tokens: int = 1024) -> LLMResponse:
     provider = CONFIG.llm_provider
+    cache_key = hashlib.sha256(f"{provider}:{CONFIG.groq_model}:{system}:{prompt}:{max_tokens}".encode()).hexdigest()
+
+    cached = _lookup_cache(cache_key)
+    if cached is not None:
+        return cached
+
+    _rate_limit_throttle(min_interval=1.0)
+
     if provider == "groq" and CONFIG.groq_api_key:
-        return _call_groq(system, prompt, max_tokens)
-    if provider == "anthropic" and CONFIG.anthropic_api_key:
-        return _call_anthropic(system, prompt, max_tokens)
-    if provider == "openai" and CONFIG.openai_api_key:
-        return _call_openai(system, prompt, max_tokens)
-    # Auto-detect by available key (fallback when LLM_PROVIDER is unset or unavailable).
-    if CONFIG.groq_api_key:
-        return _call_groq(system, prompt, max_tokens)
-    if CONFIG.anthropic_api_key:
-        return _call_anthropic(system, prompt, max_tokens)
-    if CONFIG.openai_api_key:
-        return _call_openai(system, prompt, max_tokens)
-    return _call_mock(system, prompt, max_tokens)
+        resp = _call_groq(system, prompt, max_tokens)
+    elif provider == "anthropic" and CONFIG.anthropic_api_key:
+        resp = _call_anthropic(system, prompt, max_tokens)
+    elif provider == "openai" and CONFIG.openai_api_key:
+        resp = _call_openai(system, prompt, max_tokens)
+    elif CONFIG.groq_api_key:
+        resp = _call_groq(system, prompt, max_tokens)
+    elif CONFIG.anthropic_api_key:
+        resp = _call_anthropic(system, prompt, max_tokens)
+    elif CONFIG.openai_api_key:
+        resp = _call_openai(system, prompt, max_tokens)
+    else:
+        resp = _call_mock(system, prompt, max_tokens)
+
+    _save_cache(cache_key, resp)
+    return resp
 def complete_json(system: str, prompt: str, max_tokens: int = 1024) -> tuple[dict[str, Any], LLMResponse]:
     """Ask for strict JSON, parse defensively (strip code fences, retry-safe)."""
     json_instruction = (

@@ -48,9 +48,8 @@ class GraphState(TypedDict):
     rationale: str                   # why the orchestrator chose this action
 
 
-# ── Orchestrator system prompt ─────────────────────────────────────────────────
 ORCHESTRATOR_SYSTEM = """\
-You are the orchestrator of an agentic graph-investigation system.
+You are the orchestrator of an agentic graph-investigation system for Olympic queries.
 You do not answer the question yourself. Each turn, choose exactly ONE next
 action from this fixed vocabulary based on the question, the evidence
 gathered so far, and the most recently identified gap:
@@ -59,24 +58,25 @@ gathered so far, and the most recently identified gap:
                       input: {"mention": str}
   graph_traverse    – multi-hop walk from a linked entity
                       input: {"start_node_id": str, "hops": int, "edge_types": [str]}
-  vector_search     – semantic search over documents
+  vector_search     – search over documents (with graph augmentation)
                       input: {"query_text": str}
-  document_retrieve – fetch one document by id (only if a doc_id appeared in prior evidence)
+  document_retrieve – fetch one document by id
                       input: {"doc_id": str}
-  aggregate         – merge/synthesise evidence gathered so far
+  aggregate         – compute counts, sums, or synthesize evidence
                       input: {}
-  multi_hop_reason  – chain evidence to answer a sub-question
+  multi_hop_reason  – chain evidence to resolve multi-hop relations
                       input: {"sub_question": str}
-  evaluate_evidence – check sufficiency and identify the remaining gap
+  evaluate_evidence – check evidence sufficiency
                       input: {}
-  answer            – you are confident. stop investigating.
+  answer            – you have sufficient evidence. stop investigating and answer.
                       input: {}
 
 Rules:
   - Never repeat an identical action+input pair.
-  - Prefer entity_link before graph_traverse (you need a start_node_id first).
-  - Call evaluate_evidence before answer unless you just aggregated and are done.
-  - Pick answer only when you can cite specific evidence for every claim.
+  - If no evidence has been gathered yet, start with vector_search with query_text=Question.
+  - If the evidence gathered so far contains the facts needed to answer the question, select 'answer' IMMEDIATELY.
+  - For aggregation questions (e.g. how many events...), call 'aggregate' if needed to count, then 'answer'.
+  - Be decisive and efficient: minimize steps.
 
 Return ONLY valid JSON (no prose, no code fences):
 {"action": str, "action_input": dict, "rationale": str}
@@ -204,9 +204,11 @@ def node_finalize(state: GraphState) -> GraphState:
     """Generate the final answer from accumulated evidence, then stop."""
     inv = state["inv"]
     system = (
-        "Answer the question using ONLY the evidence provided. "
-        "Cite evidence ids inline like [id]. "
-        "If evidence is insufficient, say so explicitly rather than guessing."
+        "You are an expert QA assistant for Olympic sports queries. "
+        "Answer the question using the provided evidence concisely and directly. "
+        "State the exact person name, number, or event title clearly as the main answer. "
+        "Cite the evidence doc_id inline like [Q12345]. "
+        "If evidence is insufficient, state what is missing rather than guessing."
     )
     prompt = f"Question: {inv.question}\n\nEvidence:\n{inv.evidence_summary()}\n\nAnswer:"
     resp = complete(system, prompt)

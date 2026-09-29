@@ -208,7 +208,10 @@ class TigerGraphClient:
         except Exception:
             pass
 
-        # Native edge traversal fallback
+        # Native edge traversal fallback with in-memory caching
+        if not hasattr(self, "_edge_cache"):
+            self._edge_cache = {}
+
         results = []
         frontier = [start_node_id]
         seen_nodes = set([start_node_id])
@@ -218,10 +221,15 @@ class TigerGraphClient:
             next_frontier = []
             for node in frontier:
                 v_type = "Document" if node.startswith("Q") and not node.startswith("Event:") else "Entity"
-                try:
-                    edges = self.conn.getEdges(v_type, node)
-                except Exception:
-                    continue
+                cache_key = (v_type, node)
+                if cache_key in self._edge_cache:
+                    edges = self._edge_cache[cache_key]
+                else:
+                    try:
+                        edges = self.conn.getEdges(v_type, node)
+                        self._edge_cache[cache_key] = edges
+                    except Exception:
+                        continue
 
                 for e in edges:
                     rel = e.get("attributes", {}).get("rel_type") or e.get("e_type", "RELATED_TO")
@@ -240,14 +248,26 @@ class TigerGraphClient:
 
         return results
 
-    def vector_search(self, query_embedding: list[float], top_k: int = 8) -> list[dict[str, Any]]:
-        """Vector/document search using installed query or live vertex lookup."""
-        try:
-            return self.conn.runInstalledQuery("vectorTopK", params={"embedding": query_embedding, "k": top_k})
-        except Exception:
-            pass
+    def vector_search(self, query_embedding: Optional[list[float]] = None, top_k: int = 8, query_text: Optional[str] = None) -> list[dict[str, Any]]:
+        """Vector / full-text hybrid search over Olympic corpus documents."""
+        # 1. High-speed BM25 full-text search when query_text is available
+        if query_text:
+            try:
+                from .document_index import search_documents
+                docs = search_documents(query_text, top_k=top_k)
+                if docs:
+                    return docs
+            except Exception as e:
+                logger.debug("Local FTS search exception: %s", e)
 
-        # Query live Document vertices directly from Savanna Cloud
+        # 2. Installed TigerGraph query if available
+        if query_embedding:
+            try:
+                return self.conn.runInstalledQuery("vectorTopK", params={"embedding": query_embedding, "k": top_k})
+            except Exception:
+                pass
+
+        # 3. Query live Document vertices from Savanna Cloud
         try:
             v_docs = self.conn.getVertices("Document", limit=top_k)
             if v_docs:
@@ -263,7 +283,7 @@ class TigerGraphClient:
         except Exception:
             pass
 
-        # Fallback to small sample of local corpus
+        # 4. Fallback to local corpus
         corpus = self._get_corpus(limit=top_k)
         return [
             {
@@ -353,10 +373,26 @@ class MockTigerGraphClient:
             frontier = next_frontier
         return results
 
-    def vector_search(self, query_embedding: list[float], top_k: int = 8) -> list[dict[str, Any]]:
+    def vector_search(self, query_embedding: Optional[list[float]] = None, top_k: int = 8, query_text: Optional[str] = None) -> list[dict[str, Any]]:
+        if query_text:
+            try:
+                from .document_index import search_documents
+                docs = search_documents(query_text, top_k=top_k)
+                if docs:
+                    return docs
+            except Exception:
+                pass
         return [{"doc_id": d["id"], "text": d["text"], "score": 0.9} for d in list(self._docs.values())[:top_k]]
 
     def get_document(self, doc_id: str) -> Optional[dict[str, Any]]:
+        # Check SQLite FTS first
+        try:
+            from .document_index import get_db
+            row = get_db().execute("SELECT doc_id, title, text FROM docs WHERE doc_id = ? LIMIT 1;", (doc_id,)).fetchone()
+            if row:
+                return {"doc_id": row[0], "title": row[1], "text": row[2]}
+        except Exception:
+            pass
         return self._docs.get(doc_id)
 
 

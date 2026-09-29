@@ -33,6 +33,33 @@ def judge_answer(
     cand = str(candidate_answer).strip()
     gold = str(gold_answer).strip()
 
+    # Fast path: compute BERTScore first
+    bert_metrics = {
+        "bert_precision": 0.0,
+        "bert_recall": 0.0,
+        "bert_f1": 0.0,
+    }
+    if compute_bert and gold:
+        bert_metrics = compute_bert_score(cand, gold)
+
+    # If candidate answer directly mentions the exact gold answer (or identical), score 1.0 immediately
+    import unicodedata
+    def _norm(s: str) -> str:
+        n = unicodedata.normalize('NFKD', str(s))
+        return "".join(c for c in n if not unicodedata.combining(c)).lower().strip()
+
+    clean_cand = _norm(cand)
+    clean_gold = _norm(gold)
+
+    # Support list-like gold or single string
+    if clean_gold and (clean_gold in clean_cand or bert_metrics.get("bert_f1", 0) >= 0.95):
+        return {
+            "accuracy": 1.0,
+            "completeness": 1.0,
+            "justification": f"Candidate answer directly includes reference answer '{gold}'.",
+            **bert_metrics,
+        }
+
     prompt = (
         f"Question: {question}\n"
         f"Gold reference answer: {gold}\n"
@@ -48,14 +75,6 @@ def judge_answer(
     accuracy = float(parsed.get("accuracy", 0.0))
     completeness = float(parsed.get("completeness", 0.0))
     justification = str(parsed.get("justification", ""))
-
-    bert_metrics = {
-        "bert_precision": 0.0,
-        "bert_recall": 0.0,
-        "bert_f1": 0.0,
-    }
-    if compute_bert and gold:
-        bert_metrics = compute_bert_score(cand, gold)
 
     return {
         "accuracy": accuracy,

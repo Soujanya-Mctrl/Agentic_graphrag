@@ -76,7 +76,7 @@ class InvestigationState:
         self.steps.append(step)
         self.total_tokens += step.tokens_used
 
-    def evidence_summary(self, max_chars: int = 4000) -> str:
+    def evidence_summary(self, max_chars: int = 12000) -> str:
         """Condensed view of everything gathered so far, for feeding back
         into the orchestrator's next-action prompt. Truncated to keep
         token usage bounded as investigations get longer."""

@@ -42,11 +42,21 @@ def run(question: str, client, hops: int = 1, top_k: int = 5) -> dict:
         graph_facts.extend(f"{e['from']} --{e['relation']}--> {e['to']}" for e in edges)
 
     query_vec = embed(question)
-    doc_hits = client.vector_search(query_vec, top_k=top_k)
+    doc_hits = client.vector_search(query_vec, top_k=top_k, query_text=question)
 
-    context = "Graph relationships:\n" + "\n".join(graph_facts)
+    # Also traverse graph from retrieved document nodes to link athletes, venues, games (top 3)
+    for d in doc_hits[:3]:
+        d_id = d.get("doc_id")
+        if d_id:
+            d_edges = client.traverse(d_id, hops=1)
+            graph_facts.extend(f"{e['from']} --{e['relation']}--> {e['to']}" for e in d_edges)
+            # Check Event:d_id as well
+            ev_edges = client.traverse(f"Event:{d_id}", hops=1)
+            graph_facts.extend(f"{e['from']} --{e['relation']}--> {e['to']}" for e in ev_edges)
+
+    context = "Graph relationships:\n" + "\n".join(graph_facts[:15])
     context += "\n\nDocument snippets:\n" + "\n".join(
-        f"[{h.get('doc_id')}] {h.get('text', '')}" for h in doc_hits
+        f"[{h.get('doc_id')}] {h.get('text', '')}" for h in doc_hits[:12]
     )
 
     prompt = f"Question: {question}\n\n{context}\n\nAnswer:"

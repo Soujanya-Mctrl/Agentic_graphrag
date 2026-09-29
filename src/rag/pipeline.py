@@ -20,8 +20,8 @@ SYSTEM = (
 def run(question: str, client, top_k: int = 8) -> dict:
     start = time.time()
     query_vec = embed(question)
-    hits = client.vector_search(query_vec, top_k=top_k)
-    context = "\n".join(f"[{h.get('doc_id')}] {h.get('text', '')}" for h in hits)
+    hits = client.vector_search(query_vec, top_k=top_k, query_text=question)
+    context = "\n".join(f"[{h.get('doc_id')}] {h.get('text', '')}" for h in hits[:12])
 
     prompt = f"Question: {question}\n\nDocument snippets:\n{context}\n\nAnswer:"
     resp = complete(SYSTEM, prompt)

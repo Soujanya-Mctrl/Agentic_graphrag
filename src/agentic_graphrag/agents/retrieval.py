@@ -54,20 +54,38 @@ def graph_traversal_agent(state: InvestigationState, client, start_node_id: str,
 
 def vector_search_agent(state: InvestigationState, client, query_text: str, top_k: int = 8) -> list[EvidenceItem]:
     """Semantic search over unstructured documents for evidence the graph
-    doesn't capture structurally."""
+    doesn't capture structurally, plus graph linking for retrieved documents."""
     query_vec = embed(query_text)
-    hits = client.vector_search(query_vec, top_k=top_k)
+    hits = client.vector_search(query_vec, top_k=top_k, query_text=query_text)
     items = []
-    for h in hits:
+    for idx, h in enumerate(hits):
+        doc_id = h.get("doc_id", "")
+        graph_context = ""
+
+        # Graph augmentation: link connected TigerGraph entities for the top 3 most relevant documents
+        if doc_id and idx < 3:
+            try:
+                d_edges = client.traverse(doc_id, hops=1)
+                key_edges = [
+                    f"{e.get('relation', 'CONNECTED_TO')}: {e.get('to', '')}"
+                    for e in d_edges
+                    if e.get("relation") in {"WON_GOLD", "HELD_AT", "PART_OF_GAMES", "IN_SPORT", "COMPETED_IN", "HAS_MEDAL"}
+                ]
+                if key_edges:
+                    graph_context = "\nGraph Entities: " + "; ".join(key_edges[:8])
+            except Exception:
+                pass
+
         item = EvidenceItem(
             id=_new_id(),
             source_action=ActionType.VECTOR_SEARCH,
-            content=h.get("text", ""),
-            source_ref=h.get("doc_id", ""),
-            confidence=float(h.get("score", 0.5)),
+            content=f"[{doc_id}] {h.get('title', '')}\n{h.get('text', '')}{graph_context}",
+            source_ref=doc_id,
+            confidence=float(h.get("score", 0.85)),
         )
         state.add_evidence(item)
         items.append(item)
+
     return items
 
 
