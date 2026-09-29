@@ -10,6 +10,8 @@ from typing import Any, Optional
 
 from src.shared.config import CONFIG
 
+_EXHAUSTED_MODELS: dict[str, float] = {}
+
 
 class LLMResponse:
     def __init__(self, text: str, input_tokens: int, output_tokens: int):
@@ -89,13 +91,20 @@ def _call_groq(system: str, prompt: str, max_tokens: int) -> LLMResponse:
         base_url="https://api.groq.com/openai/v1",
     )
 
-    primary_model = CONFIG.groq_model or "qwen/qwen3.8-27b"
+    # Priority list of models on Groq
+    primary_model = CONFIG.groq_model or "openai/gpt-oss-120b"
     candidate_models = [primary_model, "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.8-27b"]
     seen = set()
     models_to_try = [m for m in candidate_models if m and not (m in seen or seen.add(m))]
 
+    # Filter out temporarily exhausted models (e.g. daily token limits)
+    now = time.time()
+    active_models = [m for m in models_to_try if _EXHAUSTED_MODELS.get(m, 0) < now]
+    if not active_models:
+        active_models = models_to_try  # retry if all marked
+
     last_error = None
-    for model_name in models_to_try:
+    for model_name in active_models:
         for attempt in range(2):
             try:
                 resp = client.chat.completions.create(
@@ -118,8 +127,13 @@ def _call_groq(system: str, prompt: str, max_tokens: int) -> LLMResponse:
                 last_error = e
                 err_msg = str(e).lower()
                 status_code = getattr(e, "status_code", None)
+                if "tokens per day" in err_msg or "tpd" in err_msg:
+                    # Daily token limit reached on this model; silence it for 15 minutes
+                    _EXHAUSTED_MODELS[model_name] = now + 900
+                    logging.getLogger("llm").warning("Groq model '%s' reached daily token limit. Skipping for 15m.", model_name)
+                    break
                 if (status_code == 429 or "rate_limit" in err_msg or "429" in err_msg) and attempt == 0:
-                    sleep_time = 1.5
+                    sleep_time = 1.0
                     logging.getLogger("llm").warning(
                         "Groq rate limit on '%s' (attempt 1/2). Pausing %.1fs...",
                         model_name,

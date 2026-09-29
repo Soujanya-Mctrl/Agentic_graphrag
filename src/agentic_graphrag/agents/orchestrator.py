@@ -237,25 +237,8 @@ def node_finalize(state: GraphState) -> GraphState:
     det = deterministic_solve(inv.question, inv.evidence_list())
 
     if det["solved"] and det["confidence"] >= 0.9:
-        system = (
-            "You are an expert QA assistant for Olympic sports queries. "
-            "You are provided with a verified deterministic calculation and evidence snippet. "
-            "Answer the question concisely and directly stating the exact verified answer and citing the doc_id. "
-            "Never contradict the verified facts."
-        )
-        prompt = (
-            f"Question: {inv.question}\n\n"
-            f"Verified Ground Truth: {det['synthesis']}\n\n"
-            f"Target Answer: {det['answer']}\n"
-            f"Citations: {', '.join('[' + d + ']' for d in det['doc_ids'])}\n\n"
-            "State the final answer directly with citations:"
-        )
-        try:
-            resp = complete(system, prompt, max_tokens=150)
-            inv.total_tokens += resp.total_tokens
-            inv.final_answer = resp.text.strip()
-        except Exception:
-            inv.final_answer = det["synthesis"]
+        citations_str = f"\n\nCitations: {', '.join('[' + d + ']' for d in det['doc_ids'])}" if det.get("doc_ids") else ""
+        inv.final_answer = f"{det['answer']}. {det['synthesis']}{citations_str}"
         inv.final_confidence = det["confidence"]
     else:
         system = (

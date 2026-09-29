@@ -322,7 +322,6 @@ export default function SubgraphVisualizer({
       },
       minZoom: 0.3,
       maxZoom: 3.0,
-      wheelSensitivity: 0.25,
     });
 
     // Node Click -> Open Inspector Card
@@ -348,6 +347,7 @@ export default function SubgraphVisualizer({
 
     // Hover Highlight Behavior
     cy.on('mouseover', 'node', (evt) => {
+      if (!cy || cy.destroyed()) return;
       const node = evt.target;
       const neighborhood = node.neighborhood().add(node);
       cy.elements().addClass('dimmed');
@@ -355,11 +355,13 @@ export default function SubgraphVisualizer({
     });
 
     cy.on('mouseout', 'node', () => {
+      if (!cy || cy.destroyed()) return;
       cy.elements().removeClass('dimmed highlighted');
     });
 
     // Background Click -> Deselect
     cy.on('tap', (evt) => {
+      if (!cy || cy.destroyed()) return;
       if (evt.target === cy) {
         setSelectedNode(null);
         cy.elements().removeClass('selected dimmed highlighted');
@@ -370,7 +372,12 @@ export default function SubgraphVisualizer({
 
     return () => {
       if (cyRef.current) {
-        cyRef.current.destroy();
+        try {
+          cyRef.current.removeAllListeners();
+          cyRef.current.destroy();
+        } catch (e) {
+          // ignore cleanup race
+        }
         cyRef.current = null;
       }
     };

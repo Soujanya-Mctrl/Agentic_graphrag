@@ -14,6 +14,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 import sys
 import threading
 import time
@@ -245,7 +246,7 @@ def run_investigation(req: InvestigateRequest):
                 steps = trace_dict.get("steps", [])
                 trace_dag = steps
 
-                # Parse entities and relationships from evidence trail
+                # Parse entities, documents, and relationships from evidence trail
                 for ev in trace_dict.get("evidence", []):
                     content = ev.get("content", "")
                     if "-->" in content:
@@ -271,6 +272,32 @@ def run_investigation(req: InvestigateRequest):
                         if src_ref and src_ref not in node_ids_seen:
                             node_ids_seen.add(src_ref)
                             extracted_nodes.append({"id": src_ref, "name": src_ref.split(":")[-1], "type": "Entity"})
+                    else:
+                        doc_m = re.match(r'\[([^\]]+)\]\s*([^:\n]+)', content)
+                        if doc_m:
+                            d_id = doc_m.group(1).strip()
+                            d_title = doc_m.group(2).strip()
+                            if d_id not in node_ids_seen:
+                                node_ids_seen.add(d_id)
+                                extracted_nodes.append({"id": d_id, "name": d_title[:40], "type": "Document"})
+
+                            for yr in ["2018 Winter", "2016 Summer", "2012 Summer", "2014 Winter", "2020 Summer", "2022 Winter"]:
+                                if yr in d_title or yr[:4] in d_title:
+                                    g_id = f"Games:{yr}"
+                                    if g_id not in node_ids_seen:
+                                        node_ids_seen.add(g_id)
+                                        extracted_nodes.append({"id": g_id, "name": yr + " Games", "type": "Games"})
+                                    extracted_links.append({"source": d_id, "target": g_id, "label": "PART_OF_GAMES"})
+                                    break
+
+                            for sp in ["Biathlon", "Athletics", "Curling", "Skiing", "Ice hockey", "Figure skating", "Speed skating", "Luge", "Bobsleigh"]:
+                                if sp.lower() in d_title.lower():
+                                    s_id = f"Sport:{sp}"
+                                    if s_id not in node_ids_seen:
+                                        node_ids_seen.add(s_id)
+                                        extracted_nodes.append({"id": s_id, "name": sp, "type": "Sport"})
+                                    extracted_links.append({"source": d_id, "target": s_id, "label": "IN_SPORT"})
+                                    break
 
         except Exception as err:
             logger.error("Pipeline %s execution error: %s", p_name, err)
