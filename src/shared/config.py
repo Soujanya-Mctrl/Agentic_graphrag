@@ -34,7 +34,7 @@ class Config:
     top_k_vector: int = int(os.getenv("TOP_K_VECTOR", "8"))
 
     # --- Agent harness ---
-    max_investigation_steps: int = int(os.getenv("MAX_STEPS", "3"))
+    max_investigation_steps: int = int(os.getenv("MAX_STEPS", "5"))
     min_confidence_to_stop: float = float(os.getenv("MIN_CONFIDENCE", "0.75"))
 
     # --- Benchmark ---

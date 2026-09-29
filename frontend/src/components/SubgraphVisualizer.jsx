@@ -303,9 +303,7 @@ export default function SubgraphVisualizer({
       style: CY_STYLESHEET,
       layout: {
         name: activeLayout,
-        animate: true,
-        animationDuration: 500,
-        nodeDimensionsIncludeLabels: true,
+        animate: false,
         fit: true,
         padding: 40,
         ...(activeLayout === 'cose' ? {
@@ -313,7 +311,7 @@ export default function SubgraphVisualizer({
           idealEdgeLength: () => 90,
           edgeElasticity: () => 100,
           gravity: 0.25,
-          numIter: 800,
+          numIter: 500,
         } : {}),
         ...(activeLayout === 'concentric' ? {
           concentric: (node) => node.degree(),
@@ -373,6 +371,7 @@ export default function SubgraphVisualizer({
     return () => {
       if (cyRef.current) {
         try {
+          cyRef.current.stop();
           cyRef.current.removeAllListeners();
           cyRef.current.destroy();
         } catch (e) {

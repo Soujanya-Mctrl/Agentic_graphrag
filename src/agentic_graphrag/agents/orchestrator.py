@@ -107,13 +107,60 @@ def orchestrate(state: GraphState) -> GraphState:
     if inv.should_force_stop(CONFIG.max_investigation_steps):
         return {**state, "next_action": "answer", "next_input": {}, "rationale": "max_steps_reached"}
 
-    # 0. Deterministic fast-path: if no evidence has been collected yet, start with vector_search
-    if not inv.evidence and not inv.steps:
+    actions_taken = [s.action.value for s in inv.steps]
+
+    # Step 1: Entity Linking — Resolve key question entities on TigerGraph
+    if "entity_link" not in actions_taken:
+        q_lower = inv.question.lower()
+        mention = ""
+        for sp in ["biathlon", "athletics", "curling", "skiing", "ice hockey", "figure skating", "speed skating", "luge", "bobsleigh"]:
+            if sp in q_lower:
+                mention = sp.capitalize()
+                break
+        if not mention:
+            caps = re.findall(r"(?:[A-Z][a-zA-Z]*\s*)+", inv.question)
+            mention = max(caps, key=len).strip() if caps else inv.question.split()[0]
+
         step = InvestigationStep(
-            step_index=0,
+            step_index=len(inv.steps),
+            action=ActionType.ENTITY_LINK,
+            action_input={"mention": mention},
+            rationale=f"Identify and link core entity '{mention}' in TigerGraph schema",
+            tokens_used=0,
+        )
+        inv.record_step(step)
+        return {
+            **state,
+            "next_action": "entity_link",
+            "next_input": {"mention": mention},
+            "rationale": f"Identify and link core entity '{mention}' in TigerGraph schema",
+        }
+
+    # Step 2: Multi-Hop Graph Traversal — Explore relations from linked entity in TigerGraph
+    if "graph_traverse" not in actions_taken and inv.linked_entities:
+        start_node = inv.linked_entities[0].get("id") or inv.linked_entities[0].get("name", "")
+        step = InvestigationStep(
+            step_index=len(inv.steps),
+            action=ActionType.GRAPH_TRAVERSE,
+            action_input={"start_node_id": start_node, "hops": 1},
+            rationale=f"Traverse graph relations from '{start_node}' to discover event vertices",
+            tokens_used=0,
+        )
+        inv.record_step(step)
+        return {
+            **state,
+            "next_action": "graph_traverse",
+            "next_input": {"start_node_id": start_node, "hops": 1},
+            "rationale": f"Traverse graph relations from '{start_node}' to discover event vertices",
+        }
+
+    # Step 3: Targeted Vector Search & Document Retrieval — Fetch event infoboxes and competitor records
+    if "vector_search" not in actions_taken:
+        step = InvestigationStep(
+            step_index=len(inv.steps),
             action=ActionType.VECTOR_SEARCH,
             action_input={"query_text": inv.question},
-            rationale="Initial retrieval over documents and knowledge graph",
+            rationale="Retrieve relevant Olympic event documents and competitor infoboxes",
             tokens_used=0,
         )
         inv.record_step(step)
@@ -121,10 +168,27 @@ def orchestrate(state: GraphState) -> GraphState:
             **state,
             "next_action": "vector_search",
             "next_input": {"query_text": inv.question},
-            "rationale": "Initial retrieval over documents and knowledge graph",
+            "rationale": "Retrieve relevant Olympic event documents and competitor infoboxes",
         }
 
-    # 1. Deterministic fast-path: if evidence already solves the question with high confidence
+    # Step 4: Symbolic Aggregation & Fact Verification — Evaluate evidence constraints
+    if "aggregate" not in actions_taken:
+        step = InvestigationStep(
+            step_index=len(inv.steps),
+            action=ActionType.AGGREGATE,
+            action_input={},
+            rationale="Perform symbolic analysis and threshold evaluation over collected evidence",
+            tokens_used=0,
+        )
+        inv.record_step(step)
+        return {
+            **state,
+            "next_action": "aggregate",
+            "next_input": {},
+            "rationale": "Perform symbolic analysis and threshold evaluation over collected evidence",
+        }
+
+    # Deterministic solve check
     det = deterministic_solve(inv.question, inv.evidence_list())
     if det["solved"] and det["confidence"] >= 0.9:
         inv.final_confidence = det["confidence"]
@@ -135,15 +199,15 @@ def orchestrate(state: GraphState) -> GraphState:
             "rationale": f"Deterministic ground truth verified ({det['type']}): {det['answer']}",
         }
 
+    # LLM Dynamic Fallback if more steps are needed
     parsed, resp = complete_json(ORCHESTRATOR_SYSTEM, _orchestrate_prompt(inv))
     action   = parsed.get("action", "evaluate_evidence")
     inp      = parsed.get("action_input", {}) or {}
     rationale = parsed.get("rationale", "")
 
-    # Track orchestrator's own token spend as a step
     step = InvestigationStep(
         step_index=len(inv.steps),
-        action=ActionType(action),
+        action=ActionType(action) if action in ActionType._value2member_map_ else ActionType.EVALUATE_EVIDENCE,
         action_input=inp,
         rationale=rationale,
         tokens_used=resp.total_tokens,
